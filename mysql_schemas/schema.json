@@ -1,0 +1,67 @@
+{
+  "": {
+      "entityTypes": {
+        "User": {
+          "shape": {
+            "type": "Record",
+            "attributes": {
+              "user_role": { "type": "String" },
+              "clearance_level": { "type": "String" }
+            }
+          },
+          "memberOfTypes": []
+        },
+        "Table": {
+          "shape": {
+            "type": "Record",
+            "attributes": {
+              "data_classification": { "type": "String" }
+            }
+          },
+          "memberOfTypes": []
+        }
+      },
+      "actions": {
+        "Select": {
+          "appliesTo": {
+            "principalTypes": [
+              "User"
+            ],
+            "resourceTypes": [
+              "Table"
+            ]
+          }
+        },
+        "Insert": {
+          "appliesTo": {
+            "principalTypes": [
+              "User"
+            ],
+            "resourceTypes": [
+              "Table"
+            ]
+          }
+        },
+        "Update": {
+          "appliesTo": {
+            "principalTypes": [
+              "User"
+            ],
+            "resourceTypes": [
+              "Table"
+            ]
+          }
+        },
+        "Delete": {
+          "appliesTo": {
+            "principalTypes": [
+              "User"
+            ],
+            "resourceTypes": [
+              "Table"
+            ]
+          }
+        }
+      }
+  }
+}

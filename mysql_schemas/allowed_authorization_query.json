@@ -1,0 +1,32 @@
+[
+  {
+    "principal": "User::\"user_alice\"",
+    "action": "Action::\"Select\"",
+    "resource": "Table::\"abac_test.sensitive_data\""
+  },
+  {
+    "principal": "User::\"user_bob\"",
+    "action": "Action::\"Select\"",
+    "resource": "Table::\"abac_test.projects\""
+  },
+  {
+    "principal": "User::\"user_bob\"",
+    "action": "Action::\"Insert\"",
+    "resource": "Table::\"abac_test.projects\""
+  },
+  {
+    "principal": "User::\"user_bob\"",
+    "action": "Action::\"Update\"",
+    "resource": "Table::\"abac_test.projects\""
+  },
+  {
+    "principal": "User::\"user_bob\"",
+    "action": "Action::\"Delete\"",
+    "resource": "Table::\"abac_test.projects\""
+  },
+  {
+    "principal": "User::\"user_charlie\"",
+    "action": "Action::\"Select\"",
+    "resource": "Table::\"abac_test.employees\""
+  }  
+]

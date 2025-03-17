@@ -1,0 +1,170 @@
+[
+  {
+    "uid": {
+      "type": "Employee",
+      "id": "employee_alice"
+    },
+    "attrs": {
+      "id": 1,
+      "name": "Alice",
+      "department": "IT"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Employee",
+      "id": "employee_bob"
+    },
+    "attrs": {
+      "id": 2,
+      "name": "Bob",
+      "department": "HR"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Employee",
+      "id": "employee_charlie"
+    },
+    "attrs": {
+      "id": 3,
+      "name": "Charlie",
+      "department": "Finance"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Projects",
+      "id": "project_x"
+    },
+    "attrs": {
+      "id": 1,
+      "name": "Project X",
+      "classification": "Top Secret"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Projects",
+      "id": "project_y"
+    },
+    "attrs": {
+      "id": 2,
+      "name": "Project Y",
+      "classification": "Confidential"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Projects",
+      "id": "project_z"
+    },
+    "attrs": {
+      "id": 3,
+      "name": "Project Z",
+      "classification": "Public"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "SensitiveData",
+      "id": "sensitive_data_1"
+    },
+    "attrs": {
+      "id": 1,
+      "info": "Sensitive information 1"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "SensitiveData",
+      "id": "sensitive_data_2"
+    },
+    "attrs": {
+      "id": 2,
+      "info": "Sensitive information 2"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "SensitiveData",
+      "id": "sensitive_data_3"
+    },
+    "attrs": {
+      "id": 3,
+      "info": "Sensitive information 3"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "User",
+      "id": "user_alice"
+    },
+    "attrs": {
+      "user_role": "manager",
+      "clearance_level": "top_secret"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "User",
+      "id": "user_bob"
+    },
+    "attrs": {
+      "user_role": "employee",
+      "clearance_level": "confidential"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "User",
+      "id": "user_charlie"
+    },
+    "attrs": {
+      "user_role": "intern",
+      "clearance_level": "public"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Table",
+      "id": "abac_test.employees"
+    },
+    "attrs": {
+      "data_classification": "public"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Table",
+      "id": "abac_test.projects"
+    },
+    "attrs": {
+      "data_classification": "private"
+    },
+    "parents": []
+  },
+  {
+    "uid": {
+      "type": "Table",
+      "id": "abac_test.sensitive_data"
+    },
+    "attrs": {
+      "data_classification": "sensitive"
+    },
+    "parents": []
+  }
+]
