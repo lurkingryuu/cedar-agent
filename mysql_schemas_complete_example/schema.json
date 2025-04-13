@@ -4,14 +4,19 @@
         "User": {
           "shape": {
             "type": "Record",
-            "attributes": {}
+            "attributes": {
+              "user_role": { "type": "String" },
+              "clearance_level": { "type": "String" }
+            }
           },
           "memberOfTypes": []
         },
         "Table": {
           "shape": {
             "type": "Record",
-            "attributes": {}
+            "attributes": {
+              "data_classification": { "type": "String" }
+            }
           },
           "memberOfTypes": []
         }
@@ -43,16 +48,7 @@
             ],
             "resourceTypes": [
               "Table"
-            ],
-            "context": {
-                "type": "Record",
-                "attributes": {
-                    "day": { "type": "String" },
-                    "time": { "type": "Long" },
-                    "date": { "type": "Long" },
-                    "ip": { "type": "Extension", "name": "ipaddr" }
-                }
-            }
+            ]
           }
         },
         "Update": {
@@ -62,16 +58,7 @@
             ],
             "resourceTypes": [
               "Table"
-            ],
-            "context": {
-                "type": "Record",
-                "attributes": {
-                    "day": { "type": "String" },
-                    "time": { "type": "Long" },
-                    "date": { "type": "Long" },
-                    "ip": { "type": "Extension", "name": "ipaddr" }
-                }
-            }
+            ]
           }
         },
         "Delete": {
@@ -81,16 +68,7 @@
             ],
             "resourceTypes": [
               "Table"
-            ],
-            "context": {
-                "type": "Record",
-                "attributes": {
-                    "day": { "type": "String" },
-                    "time": { "type": "Long" },
-                    "date": { "type": "Long" },
-                    "ip": { "type": "Extension", "name": "ipaddr" }
-                }
-            }
+            ]
           }
         }
       }

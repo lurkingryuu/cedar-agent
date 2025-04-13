@@ -1,6 +1,6 @@
 use cedar_policy::Authorizer;
 
-use log::info;
+use log::debug;
 
 use rocket::serde::json::Json;
 use rocket::{post, State};
@@ -20,6 +20,9 @@ pub async fn is_authorized(
     authorizer: &State<Authorizer>,
     authorization_call: Json<AuthorizationCall>,
 ) -> Result<Json<AuthorizationAnswer>, AgentError> {
+    // Print the payload to the console
+    debug!("Received authorization request: {:?}", authorization_call);
+
     let policies = policy_store.policy_set().await;
     let query: AuthorizationRequest = match authorization_call.into_inner().try_into() {
         Ok(query) => query,

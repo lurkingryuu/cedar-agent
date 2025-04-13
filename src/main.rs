@@ -62,10 +62,20 @@ async fn main() -> ExitCode {
                 routes::data::get_entities,
                 routes::data::update_entities,
                 routes::data::delete_entities,
+                routes::data::add_single_data_entry,
+                routes::data::update_single_data_entry,
+                routes::data::delete_single_data_entry,
+                routes::data::update_entity_attribute,
+                routes::data::delete_entity_attribute,
+                routes::data::add_new_entity,
                 routes::authorization::is_authorized,
                 routes::schema::get_schema,
                 routes::schema::update_schema,
-                routes::schema::delete_schema
+                routes::schema::delete_schema,
+                routes::schema::add_user_attribute,
+                routes::schema::add_table_attribute,
+                routes::schema::delete_user_attribute,
+                routes::schema::delete_table_attribute,
             ],
         )
         .mount(
@@ -92,7 +102,7 @@ async fn main() -> ExitCode {
         )
         .launch()
         .await;
-    return match launch_result {
+    match launch_result {
         Ok(_) => {
             info!("Cedar-Agent shut down gracefully.");
             ExitCode::SUCCESS
@@ -101,5 +111,5 @@ async fn main() -> ExitCode {
             error!("Cedar-Agent shut down with error: {}", err);
             ExitCode::FAILURE
         }
-    };
+    }
 }

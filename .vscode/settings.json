@@ -5,6 +5,6 @@
       "editor.formatOnSave": true,
       "editor.defaultFormatter": "cedar-policy.vscode-cedar",
     },
-    "cedar.schemaFile": "mysql_schemas/schema.json",
+    "cedar.schemaFile": "mysql_schemas copy/schema.json",
     "cedar.autodetectSchemaFile": true,
   }

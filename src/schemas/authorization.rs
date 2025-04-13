@@ -26,6 +26,7 @@ pub struct AuthorizationCall {
     /// `__entity` and `__extn` escapes to be implicit, and it will error if
     /// attributes have the wrong types (e.g., string instead of integer).
     /// currently unsupported
+    // internal_schema: Option<cedar_policy::Schema>,
     #[schemars(skip)]
     policies: Option<String>,
 }
@@ -89,6 +90,7 @@ impl AuthorizationCall {
         context: Option<rocket::serde::json::Value>,
         entities: Option<rocket::serde::json::Value>,
         additional_entities: Option<rocket::serde::json::Value>,
+        // internal_schema: Option<cedar_policy::Schema>,
         policies: Option<String>,
     ) -> AuthorizationCall {
         AuthorizationCall {
@@ -98,6 +100,7 @@ impl AuthorizationCall {
             context,
             entities,
             additional_entities,
+            // internal_schema,
             policies,
         }
     }
