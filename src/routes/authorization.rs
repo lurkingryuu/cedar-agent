@@ -1,6 +1,7 @@
 use cedar_policy::Authorizer;
 
 use log::debug;
+use log::info;
 
 use rocket::serde::json::Json;
 use rocket::{post, State};
@@ -47,5 +48,6 @@ pub async fn is_authorized(
 
     info!("Querying cedar using {:?}", &request);
     let answer = authorizer.is_authorized(&request, &policies, &entities);
+    debug!("Authorization answer: {:?}", answer);
     Ok(Json::from(AuthorizationAnswer::from(answer)))
 }

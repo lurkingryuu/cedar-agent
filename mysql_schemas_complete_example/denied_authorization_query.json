@@ -1,1 +1,16 @@
-[]
+{
+    "principal": "User::\"alice\"",
+    "action": "Action::\"Select\"",
+    "resource": "Table::\"abac_test.sensitive_data\"",
+    "context": {
+        "day": "wed",
+        "date": 20250416,
+        "time": 100000,
+        "ip": {
+            "__extn": {
+                "fn": "ip",
+                "arg": "127.0.0.1"
+            }
+        }
+    }
+}

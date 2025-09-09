@@ -1,38 +1,51 @@
 permit (
   principal,
-  action == Action::"Select",
+  action in
+    [Action::"Select", Action::"Insert", Action::"Update", Action::"Delete"],
   resource
 )
 when
 {
-  ["mon", "tue", "wed", "thu", "fri"].contains(context.day) &&
-  context.time <= 210000 &&
-  context.time >= 90000
+  principal has "user_role" &&
+  principal["user_role"] == "employee" &&
+  resource has "data_classification" &&
+  resource["data_classification"] == "priv" &&
+  ["mon", "tue", "wed", "thu", "fri"].contains(context["day"]) &&
+  90000 <= context["time"] &&
+  context["time"] <= 210000 &&
+  context["ip"].isInRange(ip("127.0.0.0/8"))
 };
-// permit (
-//   principal,
-//   action in
-//     [Action::"Select", Action::"Insert", Action::"Update", Action::"Delete"],
-//   resource
-// )
-// when
-// {
-//   principal.user_role == "employee" && resource.data_classification == "private"
-// };
-// permit (
-//   principal,
-//   action == Action::"Select",
-//   resource
-// )
-// when
-// { principal.user_role == "intern" && resource.data_classification == "public" };
-// permit (
-//   principal,
-//   action == Action::"Select",
-//   resource
-// )
-// when
-// {
-//   principal.clearance_level == "top_secret" &&
-//   resource.data_classification == "sensitive"
-// };
+
+permit (
+  principal,
+  action in [Action::"Select"],
+  resource
+)
+when
+{
+  principal has "user_role" &&
+  principal["user_role"] == "intern" &&
+  resource has "data_classification" &&
+  resource["data_classification"] == "public" &&
+  ["mon", "tue", "wed", "thu", "fri"].contains(context["day"]) &&
+  90000 <= context["time"] &&
+  context["time"] <= 210000 &&
+  context["ip"].isInRange(ip("198.0.0.0/8"))
+};
+
+permit (
+  principal,
+  action in [Action::"Select"],
+  resource
+)
+when
+{
+  principal has "user_role" &&
+  principal["user_role"] == "manager" &&
+  resource has "data_classification" &&
+  resource["data_classification"] == "sensitiv" &&
+  ["mon", "tue", "wed", "thu", "fri"].contains(context["day"]) &&
+  90000 <= context["time"] &&
+  context["time"] <= 210000 &&
+  context["ip"].isInRange(ip("127.0.0.0/8"))
+};
