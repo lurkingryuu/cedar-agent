@@ -9,6 +9,7 @@ use crate::authn::ApiKey;
 use crate::errors::response::AgentError;
 use crate::schemas::data as schemas;
 use crate::{DataStore, SchemaStore};
+use log::debug;
 
 #[openapi]
 #[get("/data")]
@@ -241,8 +242,14 @@ pub async fn update_single_data_entry(
     entity_id: String,
     entities: Json<schemas::Entities>
 ) -> Result<Json<schemas::Entity>, AgentError> {
+    debug!("Updating single data entry with id: {}", entity_id);
+    if entities.len() != 1 {
+        return Err(AgentError::BadRequest { reason: "Only one entity can be updated at a time".to_string() });
+    }
+
     let schema = schema_store.get_cedar_schema().await;
     let new_entity = entities.into_inner().into_iter().last().unwrap();
+    debug!("Received entity: {:#?}", new_entity);
     let existing_entities = data_store.get_entities().await;
 
     // merge new entity with existing entities
@@ -250,15 +257,18 @@ pub async fn update_single_data_entry(
     for e in entities.iter_mut() {
         if let Some(uid) = e.get().get("uid").and_then(|uid| uid.get("id")) {
             if uid == &Value::String(entity_id.clone()) {
-            *e = new_entity.clone();
-            return Ok(Json::from(new_entity));
+                debug!("Found existing entity: {:#?}", e);
+                *e = new_entity.clone();
+                return Ok(Json::from(new_entity));
             }
         }
     }
     entities.extend(vec![new_entity].into_iter());
+    let upsert_entity = entities.clone().into_iter().last().unwrap();
+    debug!("Upserted entity: {:#?}", upsert_entity);
  
     match data_store.update_entities(entities, schema).await {
-        Ok(entities) => Ok(Json::from(entities.into_iter().last().unwrap().clone())),
+        Ok(entities) => Ok(Json::from(upsert_entity.clone())),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
         }),
