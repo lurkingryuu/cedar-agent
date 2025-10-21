@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use log::{error, info};
 use rocket::catchers;
 use rocket::http::ContentType;
+use rocket_cors::{AllowedHeaders, AllowedMethods, AllowedOrigins, CorsOptions};
 use rocket_okapi::settings::UrlObject;
 use rocket_okapi::{openapi_get_routes, rapidoc::*, swagger_ui::*};
 
@@ -31,7 +32,21 @@ async fn main() -> ExitCode {
     let config = config::init();
     logger::init(&config);
     let server_config: rocket::figment::Figment = config.borrow().into();
+    
+    // Configure CORS
+    let cors = CorsOptions::default()
+        .allowed_origins(AllowedOrigins::all())
+        .allowed_methods(
+            vec![rocket::http::Method::Get, rocket::http::Method::Post, rocket::http::Method::Put, rocket::http::Method::Delete]
+                .into_iter()
+                .map(From::from)
+                .collect(),
+        )
+        .allowed_headers(AllowedHeaders::some(&["Authorization", "Content-Type"]))
+        .allow_credentials(true);
+    
     let launch_result = rocket::custom(server_config)
+        .attach(cors.to_cors().unwrap())
         .attach(common::DefaultContentType::new(ContentType::JSON))
         .attach(services::schema::load_from_file::InitSchemaFairing)
         .attach(services::data::load_from_file::InitDataFairing)

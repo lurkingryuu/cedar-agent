@@ -19,7 +19,8 @@ clap = { version = "4.2.5", features = ["derive"] }
 envy = "0.4.2"
 log = "0.4.17"
 log4rs = "1.2.0"
-rocket = "0.5.0"
+rocket = { version = "0.5.0", features = ["json"] }
+rocket_cors = "0.6.0"
 rocket_okapi = { version = "0.8.0", features = ["swagger", "rapidoc"] }
 serde = "1.0.160"
 thiserror = "1.0.40"
