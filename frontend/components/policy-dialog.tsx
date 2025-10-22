@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/api"
-import { Policy, PolicyScope, PolicyCondition } from "@/lib/types"
+import { Policy, PolicyScope, PolicyCondition, Schema, Entity } from "@/lib/types"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Trash2 } from "lucide-react"
@@ -22,6 +22,8 @@ interface PolicyDialogProps {
 
 export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDialogProps) {
   const [loading, setLoading] = useState(false)
+  const [schema, setSchema] = useState<Schema | null>(null)
+  const [entities, setEntities] = useState<Entity[]>([])
   const [formData, setFormData] = useState<Policy>({
     id: "",
     effect: "permit",
@@ -31,7 +33,44 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
     conditions: [],
   })
 
+  // Extract entity types and actions from schema
+  const entityTypes = schema ? Object.values(schema).flatMap(ns => 
+    ns.entityTypes ? Object.keys(ns.entityTypes) : []
+  ) : []
+  
+  const actionTypes = schema ? Object.values(schema).flatMap(ns => 
+    ns.actions ? Object.keys(ns.actions) : []
+  ) : []
+
+  // Get entity IDs for a specific type
+  const getEntityIdsForType = (type: string) => {
+    return entities
+      .filter(e => e.uid.type === type)
+      .map(e => e.uid.id)
+  }
+
+  // Get entity IDs for the currently selected types
+  const principalIds = formData.principal.entity?.type ? getEntityIdsForType(formData.principal.entity.type) : []
+  const resourceIds = formData.resource.entity?.type ? getEntityIdsForType(formData.resource.entity.type) : []
+
   useEffect(() => {
+    async function loadData() {
+      try {
+        const [schemaData, entitiesData] = await Promise.all([
+          api.getSchema(),
+          api.getEntities()
+        ])
+        setSchema(schemaData)
+        setEntities(entitiesData)
+      } catch (error) {
+        console.error("Failed to load schema and entities:", error)
+      }
+    }
+    
+    if (open) {
+      loadData()
+    }
+
     if (policy) {
       setFormData(policy)
     } else {
@@ -70,8 +109,8 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
 
   function updateScope(field: 'principal' | 'action' | 'resource', op: string, entityType?: string, entityId?: string) {
     const scope: PolicyScope = { op: op as any }
-    if (op !== "All" && entityType && entityId) {
-      scope.entity = { type: entityType, id: entityId }
+    if (op !== "All" && entityType) {
+      scope.entity = { type: entityType, id: entityId || "" }
     }
     setFormData({ ...formData, [field]: scope })
   }
@@ -166,19 +205,55 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                   <>
                     <div className="space-y-2">
                       <Label>Entity Type</Label>
-                      <Input
-                        value={formData.principal.entity?.type || ""}
-                        onChange={(e) => updateScope('principal', formData.principal.op, e.target.value, formData.principal.entity?.id)}
-                        placeholder="User"
-                      />
+                      {entityTypes.length > 0 ? (
+                        <Select
+                          value={formData.principal.entity?.type || ""}
+                          onValueChange={(value) => updateScope('principal', formData.principal.op, value, "")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select entity type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {entityTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={formData.principal.entity?.type || ""}
+                          onChange={(e) => updateScope('principal', formData.principal.op, e.target.value, formData.principal.entity?.id)}
+                          placeholder="User"
+                        />
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Entity ID</Label>
-                      <Input
-                        value={formData.principal.entity?.id || ""}
-                        onChange={(e) => updateScope('principal', formData.principal.op, formData.principal.entity?.type, e.target.value)}
-                        placeholder="alice"
-                      />
+                      {principalIds.length > 0 ? (
+                        <Select
+                          value={formData.principal.entity?.id || ""}
+                          onValueChange={(value) => updateScope('principal', formData.principal.op, formData.principal.entity?.type, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select entity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {principalIds.map((id) => (
+                              <SelectItem key={id} value={id}>
+                                {id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={formData.principal.entity?.id || ""}
+                          onChange={(e) => updateScope('principal', formData.principal.op, formData.principal.entity?.type, e.target.value)}
+                          placeholder="alice"
+                        />
+                      )}
                     </div>
                   </>
                 )}
@@ -206,19 +281,43 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                   <>
                     <div className="space-y-2">
                       <Label>Entity Type</Label>
-                      <Input
-                        value={formData.action.entity?.type || ""}
-                        onChange={(e) => updateScope('action', formData.action.op, e.target.value, formData.action.entity?.id)}
-                        placeholder="Action"
-                      />
+                      <Select
+                        value={formData.action.entity?.type || "Action"}
+                        onValueChange={(value) => updateScope('action', formData.action.op, value, formData.action.entity?.id)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Action">Action</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Entity ID</Label>
-                      <Input
-                        value={formData.action.entity?.id || ""}
-                        onChange={(e) => updateScope('action', formData.action.op, formData.action.entity?.type, e.target.value)}
-                        placeholder="view"
-                      />
+                      <Label>Action ID</Label>
+                      {actionTypes.length > 0 ? (
+                        <Select
+                          value={formData.action.entity?.id || ""}
+                          onValueChange={(value) => updateScope('action', formData.action.op, formData.action.entity?.type || "Action", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select action" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {actionTypes.map((action) => (
+                              <SelectItem key={action} value={action}>
+                                {action}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={formData.action.entity?.id || ""}
+                          onChange={(e) => updateScope('action', formData.action.op, formData.action.entity?.type, e.target.value)}
+                          placeholder="view"
+                        />
+                      )}
                     </div>
                   </>
                 )}
@@ -246,19 +345,55 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                   <>
                     <div className="space-y-2">
                       <Label>Entity Type</Label>
-                      <Input
-                        value={formData.resource.entity?.type || ""}
-                        onChange={(e) => updateScope('resource', formData.resource.op, e.target.value, formData.resource.entity?.id)}
-                        placeholder="Document"
-                      />
+                      {entityTypes.length > 0 ? (
+                        <Select
+                          value={formData.resource.entity?.type || ""}
+                          onValueChange={(value) => updateScope('resource', formData.resource.op, value, "")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select entity type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {entityTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={formData.resource.entity?.type || ""}
+                          onChange={(e) => updateScope('resource', formData.resource.op, e.target.value, formData.resource.entity?.id)}
+                          placeholder="Document"
+                        />
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Entity ID</Label>
-                      <Input
-                        value={formData.resource.entity?.id || ""}
-                        onChange={(e) => updateScope('resource', formData.resource.op, formData.resource.entity?.type, e.target.value)}
-                        placeholder="doc1"
-                      />
+                      {resourceIds.length > 0 ? (
+                        <Select
+                          value={formData.resource.entity?.id || ""}
+                          onValueChange={(value) => updateScope('resource', formData.resource.op, formData.resource.entity?.type, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select entity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {resourceIds.map((id) => (
+                              <SelectItem key={id} value={id}>
+                                {id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={formData.resource.entity?.id || ""}
+                          onChange={(e) => updateScope('resource', formData.resource.op, formData.resource.entity?.type, e.target.value)}
+                          placeholder="doc1"
+                        />
+                      )}
                     </div>
                   </>
                 )}

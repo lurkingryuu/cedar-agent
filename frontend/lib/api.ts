@@ -261,6 +261,51 @@ class CedarAgentAPI {
     if (!response.ok) throw new Error('Failed to delete resource attribute');
   }
 
+  async addEntityAttribute(
+    entityType: string,
+    attributeName: string,
+    attributeType: string,
+    required: boolean,
+    namespace?: string
+  ): Promise<Schema> {
+    const response = await fetch(`${this.baseUrl}/schema/attribute`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        entity_type: entityType,
+        namespace: namespace || "",
+        name: attributeName,
+        attr_type: attributeType,
+        required: required,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add attribute: ${error}`);
+    }
+    return response.json();
+  }
+
+  async deleteEntityAttribute(
+    entityType: string,
+    attributeName: string,
+    namespace?: string
+  ): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/schema/attribute`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        entity_type: entityType,
+        namespace: namespace || "",
+        name: attributeName,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to delete attribute: ${error}`);
+    }
+  }
+
   // Authorization
   async checkAuthorization(request: AuthorizationRequest): Promise<AuthorizationResponse> {
     const response = await fetch(`${this.baseUrl}/is_authorized`, {

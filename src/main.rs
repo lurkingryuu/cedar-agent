@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use log::{error, info};
 use rocket::catchers;
 use rocket::http::ContentType;
-use rocket_cors::{AllowedHeaders, AllowedMethods, AllowedOrigins, CorsOptions};
+use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
 use rocket_okapi::settings::UrlObject;
 use rocket_okapi::{openapi_get_routes, rapidoc::*, swagger_ui::*};
 
@@ -91,6 +91,8 @@ async fn main() -> ExitCode {
                 routes::schema::add_table_attribute,
                 routes::schema::delete_user_attribute,
                 routes::schema::delete_table_attribute,
+                routes::schema::add_generic_attribute,
+                routes::schema::delete_generic_attribute,
             ],
         )
         .mount(

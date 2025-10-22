@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Plus, Upload, Download } from "lucide-react"
+import { FileText, Plus, Upload, Download, Trash2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { Schema } from "@/lib/types"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -12,12 +12,27 @@ import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { AttributeDialog } from "@/components/attribute-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function SchemaPage() {
   const [schema, setSchema] = useState<Schema | null>(null)
   const [loading, setLoading] = useState(true)
   const [schemaJson, setSchemaJson] = useState("")
   const [editing, setEditing] = useState(false)
+  const [attributeDialogOpen, setAttributeDialogOpen] = useState(false)
+  const [selectedEntityType, setSelectedEntityType] = useState<{ type: string; namespace: string } | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [attributeToDelete, setAttributeToDelete] = useState<{ entityType: string; namespace: string; attrName: string } | null>(null)
 
   useEffect(() => {
     fetchSchema()
@@ -102,20 +117,60 @@ export default function SchemaPage() {
     e.target.value = "" // Reset input
   }
 
+  function handleOpenAttributeDialog(entityType: string, namespace: string) {
+    setSelectedEntityType({ type: entityType, namespace })
+    setAttributeDialogOpen(true)
+  }
+
+  function handleDeleteAttributeClick(entityType: string, namespace: string, attrName: string) {
+    setAttributeToDelete({ entityType, namespace, attrName })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteAttribute() {
+    if (!attributeToDelete) return
+
+    try {
+      await api.deleteEntityAttribute(
+        attributeToDelete.entityType,
+        attributeToDelete.attrName,
+        attributeToDelete.namespace
+      )
+      toast.success(`Attribute "${attributeToDelete.attrName}" deleted successfully`)
+      fetchSchema()
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete attribute")
+      console.error(error)
+    } finally {
+      setDeleteDialogOpen(false)
+      setAttributeToDelete(null)
+    }
+  }
+
   function renderEntityTypes(namespace: string, entityTypes: Record<string, any>) {
     return (
       <div className="space-y-4">
         {Object.entries(entityTypes).map(([name, definition]) => (
           <Card key={name}>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Badge variant="outline">{name}</Badge>
-                {definition.memberOfTypes && definition.memberOfTypes.length > 0 && (
-                  <span className="text-sm text-muted-foreground font-normal">
-                    → {definition.memberOfTypes.join(", ")}
-                  </span>
-                )}
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Badge variant="outline">{name}</Badge>
+                  {definition.memberOfTypes && definition.memberOfTypes.length > 0 && (
+                    <span className="text-sm text-muted-foreground font-normal">
+                      → {definition.memberOfTypes.join(", ")}
+                    </span>
+                  )}
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenAttributeDialog(name, namespace)}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Attribute
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {definition.shape?.attributes && Object.keys(definition.shape.attributes).length > 0 ? (
@@ -123,10 +178,19 @@ export default function SchemaPage() {
                   <div className="text-sm font-medium">Attributes:</div>
                   <div className="grid gap-2">
                     {Object.entries(definition.shape.attributes).map(([attrName, attrDef]: [string, any]) => (
-                      <div key={attrName} className="flex items-center gap-2 text-sm p-2 rounded bg-secondary/50">
-                        <span className="font-medium">{attrName}:</span>
-                        <Badge variant="secondary" className="text-xs">{attrDef.type}</Badge>
-                        {attrDef.required && <Badge variant="destructive" className="text-xs">required</Badge>}
+                      <div key={attrName} className="flex items-center justify-between text-sm p-2 rounded bg-secondary/50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{attrName}:</span>
+                          <Badge variant="secondary" className="text-xs">{attrDef.type}</Badge>
+                          {attrDef.required && <Badge variant="destructive" className="text-xs">required</Badge>}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteAttributeClick(name, namespace, attrName)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -269,9 +333,6 @@ export default function SchemaPage() {
               ))}
 
               <div className="flex gap-2 mt-6">
-                <Button onClick={() => setEditing(true)}>
-                  Edit Schema
-                </Button>
                 <Button variant="destructive" onClick={handleDeleteSchema}>
                   Delete Schema
                 </Button>
@@ -317,6 +378,32 @@ export default function SchemaPage() {
           </Tabs>
         )}
       </div>
+
+      {selectedEntityType && (
+        <AttributeDialog
+          open={attributeDialogOpen}
+          onOpenChange={setAttributeDialogOpen}
+          entityType={selectedEntityType.type}
+          namespace={selectedEntityType.namespace}
+          onSuccess={fetchSchema}
+        />
+      )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Attribute</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the attribute "{attributeToDelete?.attrName}" from {attributeToDelete?.entityType}?
+              This action cannot be undone and may affect existing policies and entities.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAttribute}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

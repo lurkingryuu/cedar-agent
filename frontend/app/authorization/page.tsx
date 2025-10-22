@@ -1,22 +1,26 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { api } from "@/lib/api"
-import { AuthorizationRequest, AuthorizationResponse } from "@/lib/types"
+import { AuthorizationRequest, AuthorizationResponse, Schema, Entity } from "@/lib/types"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ContextBuilder } from "@/components/context-builder"
 
 export default function AuthorizationPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AuthorizationResponse | null>(null)
+  const [schema, setSchema] = useState<Schema | null>(null)
+  const [entities, setEntities] = useState<Entity[]>([])
   const [formData, setFormData] = useState({
     principalType: "User",
     principalId: "",
@@ -26,6 +30,56 @@ export default function AuthorizationPage() {
     resourceId: "",
     context: "{}",
   })
+
+  // Extract entity types and action types from schema
+  const entityTypes = schema ? Object.values(schema).flatMap(ns => 
+    ns.entityTypes ? Object.keys(ns.entityTypes) : []
+  ) : []
+  
+  const actionTypes = schema ? Object.values(schema).flatMap(ns => 
+    ns.actions ? Object.keys(ns.actions) : []
+  ) : []
+
+  // Get entity IDs for a specific type
+  const getEntityIdsForType = (type: string) => {
+    return entities
+      .filter(e => e.uid.type === type)
+      .map(e => e.uid.id)
+  }
+
+  const principalIds = getEntityIdsForType(formData.principalType)
+  const resourceIds = getEntityIdsForType(formData.resourceType)
+
+  // Get context definition from schema for the selected action
+  const getContextForAction = (actionId: string) => {
+    if (!schema || !actionId) return undefined
+    
+    for (const namespace of Object.values(schema)) {
+      if (namespace.actions && namespace.actions[actionId]) {
+        const appliesTo = namespace.actions[actionId].appliesTo as any
+        return appliesTo?.context?.attributes
+      }
+    }
+    return undefined
+  }
+
+  const schemaContext = getContextForAction(formData.actionId)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [schemaData, entitiesData] = await Promise.all([
+          api.getSchema(),
+          api.getEntities()
+        ])
+        setSchema(schemaData)
+        setEntities(entitiesData)
+      } catch (error) {
+        console.error("Failed to load schema and entities:", error)
+      }
+    }
+    loadData()
+  }, [])
 
   async function handleCheck(e: React.FormEvent) {
     e.preventDefault()
@@ -126,86 +180,159 @@ export default function AuthorizationPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="principalType">Principal Type</Label>
-                    <Input
-                      id="principalType"
+                    <Select
                       value={formData.principalType}
-                      onChange={(e) => setFormData({ ...formData, principalType: e.target.value })}
-                      placeholder="User"
-                      required
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, principalType: value, principalId: "" })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select principal type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entityTypes.length > 0 ? (
+                          entityTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="User">User</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="principalId">Principal ID</Label>
-                    <Input
-                      id="principalId"
-                      value={formData.principalId}
-                      onChange={(e) => setFormData({ ...formData, principalId: e.target.value })}
-                      placeholder="alice"
-                      required
-                    />
+                    {principalIds.length > 0 ? (
+                      <Select
+                        value={formData.principalId}
+                        onValueChange={(value) => setFormData({ ...formData, principalId: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select principal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {principalIds.map((id) => (
+                            <SelectItem key={id} value={id}>
+                              {id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="principalId"
+                        value={formData.principalId}
+                        onChange={(e) => setFormData({ ...formData, principalId: e.target.value })}
+                        placeholder="alice"
+                        required
+                      />
+                    )}
                   </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="actionType">Action Type</Label>
-                    <Input
-                      id="actionType"
+                    <Select
                       value={formData.actionType}
-                      onChange={(e) => setFormData({ ...formData, actionType: e.target.value })}
-                      placeholder="Action"
-                      required
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, actionType: value })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select action type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Action">Action</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="actionId">Action ID</Label>
-                    <Input
-                      id="actionId"
-                      value={formData.actionId}
-                      onChange={(e) => setFormData({ ...formData, actionId: e.target.value })}
-                      placeholder="view"
-                      required
-                    />
+                    {actionTypes.length > 0 ? (
+                      <Select
+                        value={formData.actionId}
+                        onValueChange={(value) => setFormData({ ...formData, actionId: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {actionTypes.map((action) => (
+                            <SelectItem key={action} value={action}>
+                              {action}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="actionId"
+                        value={formData.actionId}
+                        onChange={(e) => setFormData({ ...formData, actionId: e.target.value })}
+                        placeholder="view"
+                        required
+                      />
+                    )}
                   </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="resourceType">Resource Type</Label>
-                    <Input
-                      id="resourceType"
+                    <Select
                       value={formData.resourceType}
-                      onChange={(e) => setFormData({ ...formData, resourceType: e.target.value })}
-                      placeholder="Document"
-                      required
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, resourceType: value, resourceId: "" })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select resource type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {entityTypes.length > 0 ? (
+                          entityTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="Document">Document</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="resourceId">Resource ID</Label>
-                    <Input
-                      id="resourceId"
-                      value={formData.resourceId}
-                      onChange={(e) => setFormData({ ...formData, resourceId: e.target.value })}
-                      placeholder="doc1"
-                      required
-                    />
+                    {resourceIds.length > 0 ? (
+                      <Select
+                        value={formData.resourceId}
+                        onValueChange={(value) => setFormData({ ...formData, resourceId: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select resource" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {resourceIds.map((id) => (
+                            <SelectItem key={id} value={id}>
+                              {id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="resourceId"
+                        value={formData.resourceId}
+                        onChange={(e) => setFormData({ ...formData, resourceId: e.target.value })}
+                        placeholder="doc1"
+                        required
+                      />
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="context">Context (Optional JSON)</Label>
-                  <Textarea
-                    id="context"
-                    value={formData.context}
-                    onChange={(e) => setFormData({ ...formData, context: e.target.value })}
-                    placeholder='{"time": 1609459200, "ip": "192.168.1.1"}'
-                    className="font-mono text-sm"
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Provide additional context as JSON (leave empty if not needed)
-                  </p>
-                </div>
+                <ContextBuilder
+                  value={formData.context}
+                  onChange={(value) => setFormData({ ...formData, context: value })}
+                  schemaContext={schemaContext}
+                />
 
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading}>

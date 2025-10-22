@@ -111,3 +111,19 @@ impl AttributeSchema {
         self.required
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct GenericAttributeSchema {
+    pub entity_type: String,
+    pub namespace: Option<String>,
+    pub name: String,
+    pub attr_type: AttributeType,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DeleteAttributeSchema {
+    pub entity_type: String,
+    pub namespace: Option<String>,
+    pub name: String,
+}
