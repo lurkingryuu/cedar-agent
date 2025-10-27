@@ -7,7 +7,7 @@ pub enum PolicyStoreError {
     PolicySetError(#[from] cedar_policy::PolicySetError),
     /// Reference to ParseErrors.
     #[error("Unable to parse policy: {0}")]
-    PolicyParseError(#[from] cedar_policy_core::parser::err::ParseErrors),
+    PolicyParseError(#[from] cedar_policy::ParseErrors),
     /// Policy with the given id was not found.
     #[error("Unable to find policy with id {0}")]
     PolicyNotFoundError(String),

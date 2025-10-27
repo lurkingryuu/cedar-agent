@@ -110,9 +110,37 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
   function updateScope(field: 'principal' | 'action' | 'resource', op: string, entityType?: string, entityId?: string) {
     const scope: PolicyScope = { op: op as any }
     if (op !== "All" && entityType) {
-      scope.entity = { type: entityType, id: entityId || "" }
+      if (field === 'action' && op === "in") {
+        // For action 'in' operator, we'll handle multiple entities separately
+        scope.entity = { type: entityType, id: entityId || "" }
+      } else if (op === "in") {
+        // For other fields' 'in' and 'not in' operators, we'll handle multiple entities separately
+        scope.entity = { type: entityType, id: entityId || "" }
+      } else {
+        scope.entity = { type: entityType, id: entityId || "" }
+      }
     }
     setFormData({ ...formData, [field]: scope })
+  }
+
+  function updateActionEntities(actionIds: string[]) {
+    const scope: PolicyScope = { 
+      op: formData.action.op,
+      entities: actionIds.map(id => ({ type: "Action", id }))
+    }
+    setFormData({ ...formData, action: scope })
+  }
+
+  function addActionToSelection(actionId: string) {
+    const currentEntities = formData.action.entities || []
+    if (!currentEntities.some(e => e.id === actionId)) {
+      updateActionEntities([...currentEntities.map(e => e.id), actionId])
+    }
+  }
+
+  function removeActionFromSelection(actionId: string) {
+    const currentEntities = formData.action.entities || []
+    updateActionEntities(currentEntities.filter(e => e.id !== actionId).map(e => e.id))
   }
 
   function addCondition() {
@@ -196,7 +224,6 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                     <SelectContent>
                       <SelectItem value="All">All</SelectItem>
                       <SelectItem value="==">==(Equals)</SelectItem>
-                      <SelectItem value="!=">!=(Not Equals)</SelectItem>
                       <SelectItem value="in">in</SelectItem>
                     </SelectContent>
                   </Select>
@@ -264,7 +291,17 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                   <Label>Operator</Label>
                   <Select
                     value={formData.action.op}
-                    onValueChange={(value) => updateScope('action', value, formData.action.entity?.type, formData.action.entity?.id)}
+                    onValueChange={(value) => {
+                      if (value === "in") {
+                        // Initialize with empty entities array for multi-select
+                        setFormData({ 
+                          ...formData, 
+                          action: { op: value as any, entities: [] }
+                        })
+                      } else {
+                        updateScope('action', value, formData.action.entity?.type, formData.action.entity?.id)
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -272,7 +309,6 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                     <SelectContent>
                       <SelectItem value="All">All</SelectItem>
                       <SelectItem value="==">==(Equals)</SelectItem>
-                      <SelectItem value="!=">!=(Not Equals)</SelectItem>
                       <SelectItem value="in">in</SelectItem>
                     </SelectContent>
                   </Select>
@@ -293,32 +329,71 @@ export function PolicyDialog({ open, onOpenChange, policy, onSuccess }: PolicyDi
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Action ID</Label>
-                      {actionTypes.length > 0 ? (
-                        <Select
-                          value={formData.action.entity?.id || ""}
-                          onValueChange={(value) => updateScope('action', formData.action.op, formData.action.entity?.type || "Action", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select action" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {actionTypes.map((action) => (
-                              <SelectItem key={action} value={action}>
-                                {action}
-                              </SelectItem>
+                    
+                    {formData.action.op === "in" ? (
+                      <div className="space-y-2">
+                        <Label>Actions</Label>
+                        <div className="space-y-2">
+                          <Select
+                            onValueChange={(value) => addActionToSelection(value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Add action to selection" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {actionTypes
+                                .filter(action => !formData.action.entities?.some(e => e.id === action))
+                                .map((action) => (
+                                  <SelectItem key={action} value={action}>
+                                    {action}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex flex-wrap gap-2">
+                            {formData.action.entities?.map((entity) => (
+                              <div key={entity.id} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                                {entity.id}
+                                <button
+                                  type="button"
+                                  onClick={() => removeActionFromSelection(entity.id)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
                             ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          value={formData.action.entity?.id || ""}
-                          onChange={(e) => updateScope('action', formData.action.op, formData.action.entity?.type, e.target.value)}
-                          placeholder="view"
-                        />
-                      )}
-                    </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Action ID</Label>
+                        {actionTypes.length > 0 ? (
+                          <Select
+                            value={formData.action.entity?.id || ""}
+                            onValueChange={(value) => updateScope('action', formData.action.op, formData.action.entity?.type || "Action", value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select action" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {actionTypes.map((action) => (
+                                <SelectItem key={action} value={action}>
+                                  {action}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            value={formData.action.entity?.id || ""}
+                            onChange={(e) => updateScope('action', formData.action.op, formData.action.entity?.type, e.target.value)}
+                            placeholder="view"
+                          />
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </TabsContent>

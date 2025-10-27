@@ -1,7 +1,6 @@
 use cedar_policy::Authorizer;
 
-use log::debug;
-use log::info;
+use log::{debug, info, warn};
 
 use rocket::serde::json::Json;
 use rocket::{post, State};
@@ -28,6 +27,7 @@ pub async fn is_authorized(
     let query: AuthorizationRequest = match authorization_call.into_inner().try_into() {
         Ok(query) => query,
         Err(err) => {
+            warn!("Invalid authorization request: {}", err);
             return Err(AgentError::BadRequest {
                 reason: err.to_string(),
             })
@@ -40,6 +40,7 @@ pub async fn is_authorized(
     let (request, entities) = match query.get_request_entities(stored_entities) {
         Ok(result) => result,
         Err(err)=> {
+            warn!("Failed to build request/entities: {}", err);
             return Err(AgentError::BadRequest {
                 reason: err.to_string(),
             })

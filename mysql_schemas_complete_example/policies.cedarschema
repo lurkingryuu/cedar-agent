@@ -49,3 +49,13 @@ when
   context["time"] <= 210000 &&
   context["ip"].isInRange(ip("127.0.0.0/8"))
 };
+
+permit (
+  principal,
+  action,
+  resource
+)
+when
+{
+  resource is Column
+}

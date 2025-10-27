@@ -10,6 +10,7 @@ use crate::schemas::schema::Schema as InternalSchema;
 use crate::schemas::schema::AttributeSchema;
 use crate::schemas::schema::{GenericAttributeSchema, DeleteAttributeSchema};
 use crate::services::{schema::SchemaStore, policies::PolicyStore, data::DataStore};
+use log::{info, warn};
 
 #[openapi]
 #[get("/schema")]
@@ -17,6 +18,7 @@ pub async fn get_schema(
     _auth: ApiKey,
     schema_store: &State<Box<dyn SchemaStore>>
 ) -> Result<Json<InternalSchema>, AgentError> {
+    info!("Fetching schema");
     Ok(Json::from(schema_store.get_internal_schema().await))
 }
 
@@ -29,6 +31,7 @@ pub async fn update_schema(
     data_store: &State<Box<dyn DataStore>>,
     schema: Json<InternalSchema>
 ) -> Result<Json<InternalSchema>, AgentError> {
+    info!("Updating schema");
     let cedar_schema: CedarSchema = match schema.clone().into_inner().try_into() {
         Ok(schema) => schema,
         Err(err) => return Err(AgentError::BadRequest {
@@ -66,6 +69,7 @@ pub async fn delete_schema(
     _auth: ApiKey,
     schema_store: &State<Box<dyn SchemaStore>>
 ) -> Result<status::NoContent, AgentError> {
+    info!("Deleting schema");
     schema_store.delete_schema().await;
     Ok(status::NoContent)
 }
@@ -79,6 +83,7 @@ pub async fn add_user_attribute(
     data_store: &State<Box<dyn DataStore>>,
     attr: Json<AttributeSchema>,
 ) -> Result<Json<InternalSchema>, AgentError> {
+    info!("Adding attribute to User: '{}'", attr.get_name());
     add_entity_attribute(
         "User",
         attr,
@@ -97,6 +102,7 @@ pub async fn add_table_attribute(
     data_store: &State<Box<dyn DataStore>>,
     attr: Json<AttributeSchema>,
 ) -> Result<Json<InternalSchema>, AgentError> {
+    info!("Adding attribute to Table: '{}'", attr.get_name());
     add_entity_attribute(
         "Table",
         attr,
@@ -116,6 +122,7 @@ pub async fn delete_user_attribute(
     policy_store: &State<Box<dyn PolicyStore>>,
     data_store: &State<Box<dyn DataStore>>,
 ) -> Result<status::NoContent, AgentError> {
+    info!("Deleting User attribute '{}'", attr_name);
     let mut schema = schema_store.get_internal_schema().await;
     let something = schema.get_mut().get_mut("")
         .and_then(|v| v.get_mut("entityTypes"))
@@ -129,7 +136,9 @@ pub async fn delete_user_attribute(
         .ok_or_else(|| AgentError::BadRequest {
             reason: "Entity type 'User' not found in schema".to_string(),
         })?;
-    something.remove(&attr_name);
+    if something.remove(&attr_name).is_none() {
+        return Err(AgentError::NotFound { object: "Attribute", id: format!("User::{}", attr_name) });
+    }
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
@@ -173,6 +182,7 @@ pub async fn delete_table_attribute(
     policy_store: &State<Box<dyn PolicyStore>>,
     data_store: &State<Box<dyn DataStore>>,
 ) -> Result<status::NoContent, AgentError> {
+    info!("Deleting Table attribute '{}'", attr_name);
     let mut schema = schema_store.get_internal_schema().await;
     let something = schema.get_mut().get_mut("")
         .and_then(|v| v.get_mut("entityTypes"))
@@ -186,7 +196,9 @@ pub async fn delete_table_attribute(
         .ok_or_else(|| AgentError::BadRequest {
             reason: "Entity type 'Table' not found in schema".to_string(),
         })?;
-    something.remove(&attr_name);
+    if something.remove(&attr_name).is_none() {
+        return Err(AgentError::NotFound { object: "Attribute", id: format!("Table::{}", attr_name) });
+    }
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
@@ -252,6 +264,10 @@ async fn add_entity_attribute(
         .ok_or_else(|| AgentError::BadRequest {
             reason: format!("Entity type '{}' not found in schema", entity_type),
         })?;
+    if something.contains_key(attr.get_name()) {
+        warn!("Duplicate attribute '{}' on entity '{}'", attr.get_name(), entity_type);
+        return Err(AgentError::Duplicate { object: "Attribute", id: format!("{}::{}", entity_type, attr.get_name()) });
+    }
     something.insert(attr.get_name().clone(), new_attr);
 
     
@@ -312,6 +328,7 @@ pub async fn add_generic_attribute(
 ) -> Result<Json<InternalSchema>, AgentError> {
     let attr = attr.into_inner();
     let namespace = attr.namespace.unwrap_or_default();
+    info!("Adding generic attribute '{}' to entity '{}' in namespace '{}'", attr.name, attr.entity_type, namespace);
     
     // get current schema in json format
     let mut schema: InternalSchema = schema_store.get_internal_schema().await;
@@ -348,6 +365,10 @@ pub async fn add_generic_attribute(
             reason: format!("Attributes is not an object for entity type '{}'", attr.entity_type),
         })?;
     
+    if something.contains_key(&attr.name) {
+        warn!("Duplicate attribute '{}' on entity '{}'", attr.name, attr.entity_type);
+        return Err(AgentError::Duplicate { object: "Attribute", id: format!("{}::{}", attr.entity_type, attr.name) });
+    }
     something.insert(attr.name.clone(), new_attr);
 
     // validate the new schema with the current policies
@@ -396,6 +417,7 @@ pub async fn delete_generic_attribute(
 ) -> Result<status::NoContent, AgentError> {
     let attr = attr.into_inner();
     let namespace = attr.namespace.unwrap_or_default();
+    info!("Deleting generic attribute '{}' from entity '{}' in namespace '{}'", attr.name, attr.entity_type, namespace);
     
     let mut schema = schema_store.get_internal_schema().await;
     let something = schema.get_mut().get_mut(&namespace)
@@ -423,7 +445,9 @@ pub async fn delete_generic_attribute(
             reason: format!("Attributes is not an object for entity type '{}'", attr.entity_type),
         })?;
     
-    something.remove(&attr.name);
+    if something.remove(&attr.name).is_none() {
+        return Err(AgentError::NotFound { object: "Attribute", id: format!("{}::{}", attr.entity_type, attr.name) });
+    }
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {

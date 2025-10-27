@@ -1,4 +1,4 @@
-use cedar_policy_core::parser::err::ParseErrors;
+use std::str::FromStr;
 use log::debug;
 use rocket_okapi::okapi::schemars;
 use rocket_okapi::okapi::schemars::JsonSchema;
@@ -19,11 +19,11 @@ impl From<cedar_policy::Policy> for Policy {
 }
 
 impl TryInto<cedar_policy::Policy> for &Policy {
-    type Error = ParseErrors;
+    type Error = cedar_policy::ParseErrors;
 
     fn try_into(self) -> Result<cedar_policy::Policy, Self::Error> {
         debug!("Parsing policy");
-        cedar_policy::Policy::parse(Some(self.id.clone()), self.content.clone())
+        cedar_policy::Policy::parse(Some(cedar_policy::PolicyId::from_str(&self.id).unwrap()), self.content.clone())
     }
 }
 

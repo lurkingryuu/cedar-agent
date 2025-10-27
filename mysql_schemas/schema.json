@@ -8,6 +8,13 @@
           },
           "memberOfTypes": []
         },
+        "Column": {
+          "shape": {
+            "type": "Record",
+            "attributes": {}
+          },
+          "memberOfTypes": []
+        },
         "Table": {
           "shape": {
             "type": "Record",
@@ -24,13 +31,15 @@
         }
       },
       "actions": {
-        "Select": {
+        "SELECT": {
           "appliesTo": {
             "principalTypes": [
               "User"
             ],
             "resourceTypes": [
-              "Table"
+              "Column",
+              "Table",
+              "Database"
             ],
             "context": {
                 "type": "Record",
@@ -43,13 +52,15 @@
             }
           }
         },
-        "Insert": {
+        "INSERT": {
           "appliesTo": {
             "principalTypes": [
               "User"
             ],
             "resourceTypes": [
-              "Table"
+              "Column",
+              "Table",
+              "Database"
             ],
             "context": {
                 "type": "Record",
@@ -62,13 +73,15 @@
             }
           }
         },
-        "Update": {
+        "UPDATE": {
           "appliesTo": {
             "principalTypes": [
               "User"
             ],
             "resourceTypes": [
-              "Table"
+              "Column",
+              "Table",
+              "Database"
             ],
             "context": {
                 "type": "Record",
@@ -81,13 +94,15 @@
             }
           }
         },
-        "Delete": {
+        "DELETE": {
           "appliesTo": {
             "principalTypes": [
               "User"
             ],
             "resourceTypes": [
-              "Table"
+              "Column",
+              "Table",
+              "Database"
             ],
             "context": {
                 "type": "Record",

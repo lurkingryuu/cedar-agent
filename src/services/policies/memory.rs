@@ -4,7 +4,7 @@ use std::error::Error;
 
 use async_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use async_trait::async_trait;
-use cedar_policy::{PolicySet, PolicySetError, Schema, Validator, ValidationMode, ValidationResult};
+use cedar_policy::{PolicySet, Schema, Validator, ValidationMode, ValidationResult};
 use log::{debug, info};
 
 use crate::common;
@@ -123,7 +123,7 @@ impl PolicyStore for MemoryPolicyStore {
         let mut lock = self.write().await;
         let stored_policy = lock.0.get(&policy.id);
         match stored_policy {
-            Some(_) => Err(PolicySetError::AlreadyDefined.into()),
+            Some(_) => Err(Box::new(std::io::Error::new(std::io::ErrorKind::AlreadyExists, format!("Policy with id {} already exists", policy.id)))),
             None => {
                 let policy: cedar_policy::Policy = match policy.try_into() {
                     Ok(p) => p,
@@ -151,7 +151,7 @@ impl PolicyStore for MemoryPolicyStore {
         let mut new_policies: HashMap<String, cedar_policy::Policy> = HashMap::new();
         for policy in policies {
             match new_policies.get(&policy.id) {
-                Some(_) => return Err(PolicySetError::AlreadyDefined.into()),
+                Some(_) => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::AlreadyExists, format!("Policy with id {} already exists", policy.id)))),
                 None => {
                     let policy: cedar_policy::Policy = match policy.borrow().try_into() {
                         Ok(p) => p,

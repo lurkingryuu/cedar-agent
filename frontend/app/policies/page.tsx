@@ -86,6 +86,10 @@ export default function PoliciesPage() {
 
   function formatScope(scope: any): string {
     if (scope.op === "All") return "All"
+    if (scope.entities && scope.op === "in") {
+      const entityList = scope.entities.map((entity: any) => `${entity.type}::"${entity.id}"`).join(", ")
+      return `${scope.op} [${entityList}]`
+    }
     if (!scope.entity) return scope.op
     return `${scope.op} ${scope.entity.type}::"${scope.entity.id}"`
   }

@@ -1,10 +1,9 @@
-use std::str::FromStr;
-
 use async_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use async_trait::async_trait;
 use cedar_policy::Schema as CedarSchema;
 use cedar_policy::SchemaError;
 use log::{debug, error, info};
+use rocket::serde::json::serde_json;
 
 use crate::schemas::schema::Schema as InternalSchema;
 use crate::services::schema::SchemaStore;
@@ -13,8 +12,14 @@ pub struct Schema(CedarSchema, InternalSchema);
 
 impl Schema {
     fn empty() -> Self {
+        let empty_json = serde_json::json!({
+            "": {
+                "entityTypes": {},
+                "actions": {}
+            }
+        });
         Self {
-            0: CedarSchema::from_str("{}").unwrap(),
+            0: CedarSchema::from_json_value(empty_json).unwrap(),
             1: InternalSchema::empty()
         }
     }

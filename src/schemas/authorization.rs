@@ -3,10 +3,9 @@ use std::error::Error;
 use std::str::FromStr;
 
 
-use cedar_policy::{Context, EntityUid, EvaluationError, Request, Response, Entities};
+use cedar_policy::{Context, EntityUid, Request, Response, Entities};
 use cedar_policy_core::authorizer::Decision;
-use cedar_policy_core::parser::err::ParseErrors;
-use cedar_policy_core::entities::EntitiesError;
+use cedar_policy_core::entities::err::EntitiesError;
 
 use rocket::serde::json::serde_json;
 use rocket_okapi::okapi::schemars;
@@ -62,7 +61,7 @@ impl AuthorizationRequest {
         let patched_entities = match self.additional_entities {
             None => request_entities,
             Some(ents) => {
-                match Entities::from_entities(request_entities.iter().chain(ents.iter()).cloned()) {
+                match Entities::from_entities(request_entities.iter().chain(ents.iter()).cloned(), None) {
                     Ok(entities) => entities,
                     Err(err) => return Err(err)
                 }
@@ -72,7 +71,7 @@ impl AuthorizationRequest {
     }
 }
 
-fn string_to_euid(optional_str: Option<String>) -> Result<Option<EntityUid>, ParseErrors> {
+fn string_to_euid(optional_str: Option<String>) -> Result<Option<EntityUid>, cedar_policy::ParseErrors> {
     match optional_str {
         Some(p) => match EntityUid::from_str(&p) {
             Ok(euid) => Ok(Some(euid)),
@@ -146,7 +145,7 @@ impl TryInto<AuthorizationRequest> for AuthorizationCall {
             None => Context::empty(),
         };
         Ok(AuthorizationRequest::new(
-            Request::new(principal, action, resource, context),
+            Request::new(principal.unwrap(), action.unwrap(), resource.unwrap(), context, None)?,
             entities,
             additional_entities,
         ))
@@ -191,7 +190,7 @@ impl Into<Response> for AuthorizationAnswer {
                     .iter()
                     .map(|r| cedar_policy::PolicyId::from_str(r).unwrap()),
             ),
-            self.diagnostics.errors,
+            vec![],
         )
     }
 }
@@ -205,9 +204,7 @@ impl From<Response> for AuthorizationAnswer {
             },
             diagnostics: DiagnosticsRef {
                 reason: HashSet::from_iter(value.diagnostics().reason().map(|r| r.to_string())),
-                errors: HashSet::from_iter(value.diagnostics().errors().map(|e| match e {
-                    EvaluationError::StringMessage(e) => e,
-                })),
+                errors: HashSet::from_iter(value.diagnostics().errors().map(|e| e.to_string())),
             },
         }
     }

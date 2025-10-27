@@ -14,6 +14,8 @@ export interface Entity {
 export interface PolicyScope {
   op: '==' | '!=' | 'in' | 'not in' | 'All';
   entity?: EntityUid;
+  entities?: EntityUid[]; // For 'in' operator that support multiple entities
+  // Note: For actions, only '==' and 'in' operators are supported by Cedar
 }
 
 export interface PolicyCondition {
