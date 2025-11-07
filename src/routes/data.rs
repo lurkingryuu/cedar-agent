@@ -329,37 +329,33 @@ pub async fn update_single_data_entry(
     }
     let existing_entities = data_store.get_entities().await;
 
-    // merge new entity with existing entities
-    let mut entities = existing_entities.clone();
-    let mut entity_found = false;
-    
-    for e in entities.iter_mut() {
-        if let Some(uid) = e.get().get("uid").and_then(|uid| uid.get("id")) {
-            if uid == &Value::String(entity_id.clone()) {
-                debug!("Found existing entity: {:#?}", e);
-                *e = new_entity.clone();
-                entity_found = true;
-                break;
+    // Check if entity already exists - if so, return 409 Conflict
+    if let Some(uid) = new_entity.get().get("uid") {
+        if let (Some(id), Some(typ)) = (uid.get("id"), uid.get("type")) {
+            if let (Some(id_str), Some(typ_str)) = (id.as_str(), typ.as_str()) {
+                if existing_entities.clone().into_iter().any(|e| {
+                    if let Some(euid) = e.get().get("uid") {
+                        return euid.get("id") == Some(&Value::String(id_str.to_string())) &&
+                               euid.get("type") == Some(&Value::String(typ_str.to_string()));
+                    }
+                    false
+                }) {
+                    warn!("Duplicate entity detected when updating single entry: {}::{}", typ_str, id_str);
+                    return Err(AgentError::Duplicate { object: "Entity", id: format!("{}::{}", typ_str, id_str) });
+                }
             }
         }
     }
+
+    // Entity doesn't exist, add it as new
+    let mut entities = existing_entities.clone();
+    entities.extend(vec![new_entity.clone()].into_iter());
     
-    // If entity not found, add it as new
-    if !entity_found {
-        entities.extend(vec![new_entity.clone()].into_iter());
-    }
-    
-    let updated_entity = if entity_found {
-        new_entity.clone()
-    } else {
-        entities.clone().into_iter().last().unwrap()
-    };
-    
-    debug!("Updated entity: {:#?}", updated_entity);
+    debug!("Creating new entity: {:#?}", new_entity);
  
-    // Always persist the changes to the data store
+    // Persist the new entity to the data store
     match data_store.update_entities(entities, schema).await {
-        Ok(_) => Ok(Json::from(updated_entity)),
+        Ok(_) => Ok(Json::from(new_entity)),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
         }),
