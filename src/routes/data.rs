@@ -3,7 +3,7 @@ use rocket::response::status;
 use rocket::serde::json::{Json, Value, *};
 use std::collections::HashSet;
 use serde_json::Map;
-use rocket::{delete, get, put, State};
+use rocket::{delete, get, put, patch, State};
 use rocket_okapi::openapi;
 
 use crate::authn::ApiKey;
@@ -246,6 +246,114 @@ pub async fn delete_entity_attribute(
         .inner()
         .update_entities(entities, schema_store.get_cedar_schema().await)
         .await.map_err(|err| AgentError::BadRequest {
+            reason: err.to_string(),
+        })?;
+    
+    Ok(Json::from(entity.clone()))
+}
+
+#[openapi]
+#[patch("/data/entity/attributes", format = "json", data = "<update_request>")]
+pub async fn patch_entity_attributes(
+    _auth: ApiKey,
+    data_store: &State<Box<dyn DataStore>>,
+    schema_store: &State<Box<dyn SchemaStore>>,
+    update_request: Json<schemas::UpdateEntityAttributes>,
+) -> Result<Json<schemas::Entity>, AgentError> {
+    info!(
+        "Patching attributes on entity type='{}' id='{}'",
+        update_request.entity_type,
+        update_request.entity_id
+    );
+    
+    // Find the entity
+    let entity = data_store
+        .inner()
+        .get_entities()
+        .await
+        .into_iter()
+        .find(|e| {
+            let uid = e.get().get("uid");
+            let id_match = uid
+                .and_then(|u| u.get("id"))
+                .map(|v| v == &Value::String(update_request.entity_id.clone()))
+                .unwrap_or(false);
+            let type_match = uid
+                .and_then(|u| u.get("type"))
+                .map(|v| v == &Value::String(update_request.entity_type.clone()))
+                .unwrap_or(false);
+            id_match && type_match
+        });
+    
+    if entity.is_none() {
+        return Err(AgentError::NotFound {
+            object: "Entity",
+            id: format!("{}::{}", update_request.entity_type, update_request.entity_id),
+        });
+    }
+    
+    let mut entity = entity.unwrap().clone();
+    
+    // Ensure the entity has an "attrs" object
+    if entity.get().get("attrs").is_none() {
+        entity
+            .get_mut()
+            .as_object_mut()
+            .and_then(|obj| obj.insert("attrs".to_string(), Value::Object(Map::new())));
+    }
+    
+    // Update all attributes from the request
+    if let Some(attrs) = entity
+        .get_mut()
+        .get_mut("attrs")
+        .and_then(|attr| attr.as_object_mut())
+    {
+        for (attr_name, attr_value) in &update_request.attributes {
+            attrs.insert(attr_name.clone(), Value::String(attr_value.clone()));
+        }
+    }
+    
+    // Update parents if provided
+    if let Some(new_parents) = &update_request.parents {
+        let parents_array: Vec<Value> = new_parents.iter()
+            .map(|parent_map| {
+                let mut parent_obj = Map::new();
+                for (k, v) in parent_map {
+                    parent_obj.insert(k.clone(), v.clone());
+                }
+                Value::Object(parent_obj)
+            })
+            .collect();
+        entity.get_mut().as_object_mut()
+            .and_then(|obj| obj.insert("parents".to_string(), Value::Array(parents_array)));
+    }
+    
+    // Get all entities and update the specific one
+    let mut entities = data_store.inner().get_entities().await;
+    
+    // Find and replace the entity with the updated one (match by id and type)
+    for e in entities.iter_mut() {
+        let uid = e.get().get("uid");
+        let id_match = uid
+            .and_then(|u| u.get("id"))
+            .map(|v| v == &Value::String(update_request.entity_id.clone()))
+            .unwrap_or(false);
+        let type_match = uid
+            .and_then(|u| u.get("type"))
+            .map(|v| v == &Value::String(update_request.entity_type.clone()))
+            .unwrap_or(false);
+        if id_match && type_match {
+            *e = entity.clone();
+            break;
+        }
+    }
+    
+    // Update entities with schema validation (no duplicate check - this is for updating existing entities)
+    data_store
+        .inner()
+        .update_entities(entities, schema_store.get_cedar_schema().await)
+        .await
+        .map_err(|err| AgentError::BadRequest {
             reason: err.to_string(),
         })?;
     

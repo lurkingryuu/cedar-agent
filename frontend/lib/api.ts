@@ -10,10 +10,14 @@ import type {
 } from './types';
 
 class CedarAgentAPI {
-  private baseUrl: string;
+  // Use a getter to read the base URL dynamically from config
+  // This ensures localStorage changes are picked up without requiring a page refresh
+  private get baseUrl(): string {
+    return API_CONFIG.baseUrl;
+  }
 
   constructor() {
-    this.baseUrl = API_CONFIG.baseUrl;
+    // No initialization needed - baseUrl is now a getter
   }
 
   // Convert Cedar policy string back to structured Policy format
@@ -449,6 +453,34 @@ class CedarAgentAPI {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to delete attribute: ${error}`);
+    }
+    return response.json();
+  }
+
+  async patchEntityAttributes(
+    entityType: string,
+    entityId: string,
+    attributes: Record<string, string>,
+    parents?: Array<{ type: string; id: string }>
+  ): Promise<Entity> {
+    const body: any = {
+      entity_type: entityType,
+      entity_id: entityId,
+      attributes: attributes,
+    };
+    
+    if (parents && parents.length > 0) {
+      body.parents = parents.map(p => ({ type: p.type, id: p.id }));
+    }
+    
+    const response = await fetch(`${this.baseUrl}/data/entity/attributes`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update entity attributes: ${error}`);
     }
     return response.json();
   }

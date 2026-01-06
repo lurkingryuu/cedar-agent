@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cedar-agent-backend
+    ports:
+      - "8180:8180"
+    environment:
+      - CEDAR_AGENT_PORT=8180
+      - CEDAR_AGENT_ADDR=0.0.0.0
+      - CEDAR_AGENT_LOG_LEVEL=info
+      - CEDAR_AGENT_AUTHENTICATION=${CEDAR_AGENT_AUTHENTICATION:-}
+    volumes:
+      # Optional: Mount data files for persistence
+      - ./cedar_agent_data.json:/app/data.json:ro
+      - ./cedar_agent_policies.json:/app/policies.json:ro
+      - ./cedar_agent_schema.json:/app/schema.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8180/v1/healthy"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - cedar-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8180/v1
+        NEXT_PUBLIC_API_KEY: ${CEDAR_AGENT_AUTHENTICATION:-}
+    container_name: cedar-agent-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8180/v1
+      - NEXT_PUBLIC_API_KEY=${CEDAR_AGENT_AUTHENTICATION:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - cedar-network
+
+networks:
+  cedar-network:
+    driver: bridge
+

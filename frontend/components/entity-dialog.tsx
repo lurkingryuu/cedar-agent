@@ -145,8 +145,19 @@ export function EntityDialog({ open, onOpenChange, entity, onSuccess }: EntityDi
 
     try {
       if (entity) {
-        // Update existing entity
-        await api.updateSingleEntity(entity.uid.id, formData)
+        // Update existing entity using the new PATCH endpoint
+        // Convert attribute values to strings for the API
+        const stringAttributes: Record<string, string> = {}
+        for (const [key, value] of Object.entries(formData.attrs)) {
+          stringAttributes[key] = typeof value === 'string' ? value : JSON.stringify(value)
+        }
+        
+        await api.patchEntityAttributes(
+          formData.uid.type,
+          formData.uid.id,
+          stringAttributes,
+          formData.parents
+        )
         toast.success("Entity updated successfully")
       } else {
         // Create new entity - first add it, then update with attributes and parents
@@ -154,13 +165,17 @@ export function EntityDialog({ open, onOpenChange, entity, onSuccess }: EntityDi
         
         // If there are attributes or parents, update the entity
         if (Object.keys(formData.attrs).length > 0 || formData.parents.length > 0) {
-          const allEntities = await api.getEntities()
-          const updatedEntities = allEntities.map(e => 
-            e.uid.id === formData.uid.id && e.uid.type === formData.uid.type
-              ? formData
-              : e
+          const stringAttributes: Record<string, string> = {}
+          for (const [key, value] of Object.entries(formData.attrs)) {
+            stringAttributes[key] = typeof value === 'string' ? value : JSON.stringify(value)
+          }
+          
+          await api.patchEntityAttributes(
+            formData.uid.type,
+            formData.uid.id,
+            stringAttributes,
+            formData.parents
           )
-          await api.updateEntities(updatedEntities)
         }
         
         toast.success("Entity created successfully")

@@ -7,7 +7,7 @@ use cedar_policy_core::extensions::Extensions;
 use cedar_policy_core::{ast, entities};
 use cedar_policy::Schema;
 use log::debug;
-use rocket::serde::json::serde_json::{from_str, json, to_string};
+use rocket::serde::json::serde_json::{from_str, json, to_string, Map};
 use rocket::serde::json::Value;
 
 use rocket_okapi::okapi::schemars;
@@ -124,6 +124,10 @@ impl std::iter::FromIterator<Entity> for Entities {
 }
 
 impl Entities {
+    pub fn iter(&self) -> std::slice::Iter<'_, Entity> {
+        self.0.iter()
+    }
+
     pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Entity> {
         self.0.iter_mut()
     }
@@ -180,4 +184,13 @@ pub struct EntityAttribute {
 pub struct NewEntity {
     pub entity_type: String,
     pub entity_id: String
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
+pub struct UpdateEntityAttributes {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub attributes: std::collections::HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parents: Option<Vec<Map<String, Value>>>,
 }

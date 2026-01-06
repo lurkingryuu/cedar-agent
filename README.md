@@ -202,11 +202,29 @@ To check the arguments you can pass to the binary, run:
 
 #### Run with docker
 
+**Quick Start with Docker Compose (Recommended)**
+
+The easiest way to run the full stack (backend + frontend):
+
+```shell
+docker-compose up --build
+```
+
+This will start:
+- Backend API at `http://localhost:8180`
+- Frontend Dashboard at `http://localhost:3000`
+
+**Backend Only**
+
 To execute the Cedar Agent docker image, use the following command:
 
 ```shell
-docker run -p 8180:8180 permitio/cedar-agent
+docker run -p 8180:8180 docker.io/lurkingryuu/cedar-agent
 ```
+
+**Full Docker Setup**
+
+For complete Docker setup including multi-architecture builds, CI/CD workflows, and production deployment, see [DOCKER.md](DOCKER.md).
 
 ### Test
 

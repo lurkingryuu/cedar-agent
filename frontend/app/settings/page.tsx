@@ -33,12 +33,9 @@ export default function SettingsPage() {
     localStorage.setItem("CEDAR_API_BASE_URL", apiConfig.baseUrl)
     localStorage.setItem("CEDAR_API_KEY", apiConfig.apiKey)
     
-    // Update the global config
-    API_CONFIG.baseUrl = apiConfig.baseUrl
-    API_CONFIG.apiKey = apiConfig.apiKey
-    
+    // Config will automatically read from localStorage on next API call
     setSaved(true)
-    toast.success("Settings saved successfully. Refresh the page to apply changes.")
+    toast.success("Settings saved successfully. Changes will be applied to new API requests.")
   }
 
   function handleChange(field: string, value: string) {

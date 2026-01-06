@@ -37,16 +37,31 @@ async fn main() -> ExitCode {
     let cors = CorsOptions::default()
         .allowed_origins(AllowedOrigins::all())
         .allowed_methods(
-            vec![rocket::http::Method::Get, rocket::http::Method::Post, rocket::http::Method::Put, rocket::http::Method::Delete]
-                .into_iter()
-                .map(From::from)
-                .collect(),
+            vec![
+                rocket::http::Method::Get,
+                rocket::http::Method::Post,
+                rocket::http::Method::Put,
+                rocket::http::Method::Patch,
+                rocket::http::Method::Delete,
+                rocket::http::Method::Options,
+            ]
+            .into_iter()
+            .map(From::from)
+            .collect(),
         )
         .allowed_headers(AllowedHeaders::some(&["Authorization", "Content-Type"]))
         .allow_credentials(true);
     
+    let cors_fairing = match cors.to_cors() {
+        Ok(fairing) => fairing,
+        Err(err) => {
+            error!("Failed to configure CORS: {}", err);
+            return ExitCode::FAILURE;
+        }
+    };
+    
     let launch_result = rocket::custom(server_config)
-        .attach(cors.to_cors().unwrap())
+        .attach(cors_fairing)
         .attach(common::DefaultContentType::new(ContentType::JSON))
         .attach(services::schema::load_from_file::InitSchemaFairing)
         .attach(services::data::load_from_file::InitDataFairing)
@@ -82,6 +97,7 @@ async fn main() -> ExitCode {
                 routes::data::delete_single_data_entry,
                 routes::data::update_entity_attribute,
                 routes::data::delete_entity_attribute,
+                routes::data::patch_entity_attributes,
                 routes::data::add_new_entity,
                 routes::authorization::is_authorized,
                 routes::schema::get_schema,

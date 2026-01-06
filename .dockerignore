@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+!README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Rust
+target/
+**/*.rs.bk
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Frontend build artifacts
+frontend/.next
+frontend/out
+frontend/build
+frontend/dist
+frontend/.env*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+tests/
+*.test.rs
+*.spec.ts
+*.spec.tsx
+
+# Examples
+examples/
+mysql_schemas/
+mysql_schemas_complete_example/
+
+# Scripts
+*.sh
+!start_full_stack.sh
+
+# CI/CD
+.github/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
