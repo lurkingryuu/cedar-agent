@@ -119,10 +119,8 @@ pub async fn add_new_entity(
         });
     }
 
-    // merge new entity with existing entities
-    let mut entities = existing_entities.clone();
-    entities.extend(new_entity.clone().into_iter());
-    match data_store.update_entities(entities, schema).await {
+    // add new entity to existing entities atomically
+    match data_store.add_entities(new_entity.into_iter().collect(), schema).await {
         Ok(entities) => Ok(Json::from(entities)),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
@@ -479,11 +477,8 @@ pub async fn add_single_data_entry(
         }
     }
 
-    // merge new entities with existing entities
-    let mut entities = existing_entities.clone();
-    entities.extend(vec![new_entity].into_iter());
-
-    match data_store.update_entities(entities, schema).await {
+    // add new entities to existing entities atomically
+    match data_store.add_entities(vec![new_entity].into_iter().collect(), schema).await {
         Ok(entities) => Ok(Json::from(entities)),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
@@ -562,14 +557,11 @@ pub async fn update_single_data_entry(
         }
     }
 
-    // Entity doesn't exist, add it as new
-    let mut entities = existing_entities.clone();
-    entities.extend(vec![new_entity.clone()].into_iter());
-
+    // Entity doesn't exist, add it as new atomically
     debug!("Creating new entity: {:#?}", new_entity);
 
-    // Persist the new entity to the data store
-    match data_store.update_entities(entities, schema).await {
+    // Persist the new entity to the data store atomically
+    match data_store.add_entities(vec![new_entity.clone()].into_iter().collect(), schema).await {
         Ok(_) => Ok(Json::from(new_entity)),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),

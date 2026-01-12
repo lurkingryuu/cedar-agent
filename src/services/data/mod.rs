@@ -18,4 +18,9 @@ pub trait DataStore: Send + Sync {
         entities: schemas::Entities,
         schema: Option<Schema>,
     ) -> Result<schemas::Entities, Box<dyn Error>>;
+    async fn add_entities(
+        &self,
+        new_entities: schemas::Entities,
+        schema: Option<Schema>,
+    ) -> Result<schemas::Entities, Box<dyn Error>>;
 }
