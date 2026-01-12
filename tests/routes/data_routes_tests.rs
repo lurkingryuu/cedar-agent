@@ -339,22 +339,115 @@ async fn test_entity_not_found() {
 async fn test_add_single_entity_validated() {
     let data_store = MemoryDataStore::new();
     let schema_store = MemorySchemaStore::new();
-    
+
     schema_store.update_schema(sample_schema()).await.unwrap();
-    
+
     // Add a single valid entity
     let entity = create_entity_with_attrs(
         "User",
         "single_user",
         rocket::serde::json::json!({"department": "HR", "level": 3}),
     );
-    
+
     let result = data_store
         .update_entities(vec![entity].into_iter().collect(), schema_store.get_cedar_schema().await)
         .await;
     assert!(result.is_ok());
-    
+
     let stored = data_store.get_entities().await;
     assert_eq!(stored.len(), 1);
+}
+
+/// Test namespace field handling in data structures
+#[tokio::test]
+async fn test_namespace_field_in_data_structures() {
+    use crate::routes::utils::*;
+
+    // Test NewEntity with namespace
+    let namespaced_entity = new_entity_with_namespace("User", "test_user", "MySQL");
+    assert_eq!(namespaced_entity.entity_type, "User");
+    assert_eq!(namespaced_entity.namespace, "MySQL");
+    assert_eq!(namespaced_entity.entity_id, "test_user");
+
+    // Test EntityAttributeWithValue with namespace
+    let attr_with_ns = entity_attr_with_value_with_namespace("User", "test_user", "department", "Engineering", "MySQL");
+    assert_eq!(attr_with_ns.entity_type, "User");
+    assert_eq!(attr_with_ns.namespace, "MySQL");
+    assert_eq!(attr_with_ns.entity_id, "test_user");
+    assert_eq!(attr_with_ns.attribute_name, "department");
+    assert_eq!(attr_with_ns.attribute_value, "Engineering");
+
+    // Test EntityAttribute with namespace
+    let attr_ns = entity_attr_with_namespace("User", "test_user", "department", "MySQL");
+    assert_eq!(attr_ns.entity_type, "User");
+    assert_eq!(attr_ns.namespace, "MySQL");
+    assert_eq!(attr_ns.entity_id, "test_user");
+    assert_eq!(attr_ns.attribute_name, "department");
+
+    // Test default empty namespace
+    let default_entity = new_entity("User", "test_user");
+    assert_eq!(default_entity.namespace, "");
+}
+
+/// Test Cedar UID parsing for namespace support
+#[tokio::test]
+async fn test_cedar_uid_parsing() {
+    use cedar_policy::EntityUid;
+    use std::str::FromStr;
+
+    // Test parsing namespaced UIDs
+    let namespaced_uid_str = "MySQL::User::\"test_user\"";
+    let uid = EntityUid::from_str(namespaced_uid_str).unwrap();
+    assert_eq!(uid.to_string(), namespaced_uid_str);
+
+    // Test parsing non-namespaced UIDs
+    let simple_uid_str = "User::\"test_user\"";
+    let uid2 = EntityUid::from_str(simple_uid_str).unwrap();
+    assert_eq!(uid2.to_string(), simple_uid_str);
+
+    // Test that namespaced and non-namespaced UIDs are different
+    assert_ne!(uid, uid2);
+}
+
+/// Test entity matching logic with namespaces
+#[tokio::test]
+async fn test_entity_matching_with_namespaces() {
+    let data_store = MemoryDataStore::new();
+
+    // Create entities with different namespaces
+    let mysql_user = create_entity_with_attrs_and_namespace("User", "alice", "MySQL", rocket::serde::json::json!({
+        "department": "Engineering"
+    }));
+
+    let pgsql_user = create_entity_with_attrs_and_namespace("User", "alice", "PostgreSQL", rocket::serde::json::json!({
+        "department": "HR"
+    }));
+
+    let simple_user = create_entity_with_attrs("User", "alice", rocket::serde::json::json!({
+        "department": "Sales"
+    }));
+
+    // Add all entities
+    let entities = vec![mysql_user, pgsql_user, simple_user];
+    data_store.update_entities(entities.into_iter().collect(), None).await.unwrap();
+
+    let stored = data_store.get_entities().await;
+    assert_eq!(stored.len(), 3);
+
+    // Verify we can distinguish between namespaced entities
+    let mysql_entities: Vec<_> = stored.iter().filter(|e| {
+        e.get().get("uid").and_then(|u| u.get("type")).and_then(|t| t.as_str()) == Some("MySQL::User")
+    }).collect();
+    assert_eq!(mysql_entities.len(), 1);
+
+    let pgsql_entities: Vec<_> = stored.iter().filter(|e| {
+        e.get().get("uid").and_then(|u| u.get("type")).and_then(|t| t.as_str()) == Some("PostgreSQL::User")
+    }).collect();
+    assert_eq!(pgsql_entities.len(), 1);
+
+    let simple_entities: Vec<_> = stored.iter().filter(|e| {
+        e.get().get("uid").and_then(|u| u.get("type")).and_then(|t| t.as_str()) == Some("User")
+    }).collect();
+    assert_eq!(simple_entities.len(), 1);
 }
 

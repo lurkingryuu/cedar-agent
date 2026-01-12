@@ -2,9 +2,11 @@ use rocket::response::status;
 
 use rocket::serde::json::{Json, Value, *};
 use std::collections::HashSet;
+use std::str::FromStr;
 use serde_json::Map;
 use rocket::{delete, get, put, patch, State};
 use rocket_okapi::openapi;
+use cedar_policy::EntityUid;
 
 use crate::authn::ApiKey;
 use crate::errors::response::AgentError;
@@ -78,23 +80,18 @@ pub async fn add_new_entity(
     entity: Json<schemas::NewEntity>,
 ) -> Result<Json<schemas::Entities>, AgentError> {
     let schema = schema_store.get_cedar_schema().await;
-    info!("Adding new entity: type='{}', id='{}'", entity.entity_type, entity.entity_id);
-    /*
-    {
-        "uid": {
-            "id": entity.entity_id,
-            "type": entity.entity_type,
-        },
-        "attrs": {},
-        "parents": []
-    }
-     */
+    let full_type = if entity.namespace.is_empty() {
+        entity.entity_type.clone()
+    } else {
+        format!("{}::{}", entity.namespace, entity.entity_type)
+    };
+    info!("Adding new entity: type='{}', id='{}'", full_type, entity.entity_id);
     
     // create new entity from a string representation of the above format
     let new_entity = schemas::Entity::from(json!({
         "uid": {
             "id": entity.entity_id,
-            "type": entity.entity_type,
+            "type": full_type,
         },
         "attrs": {},
         "parents": []
@@ -106,7 +103,7 @@ pub async fn add_new_entity(
     if existing_entities.clone().into_iter().any(|e| {
         if let Some(uid) = e.get().get("uid") {
             return uid.get("id").unwrap() == &Value::String(entity.entity_id.clone()) &&
-                   uid.get("type").unwrap() == &Value::String(entity.entity_type.clone());
+                   uid.get("type").unwrap() == &Value::String(full_type.clone());
         }
         false
     }) {
@@ -133,10 +130,15 @@ pub async fn update_entity_attribute(
     schema_store: &State<Box<dyn SchemaStore>>,
     entity_attribute: Json<schemas::EntityAttributeWithValue>,
 ) -> Result<Json<schemas::Entity>, AgentError> {
+    let full_type = if entity_attribute.namespace.is_empty() {
+        entity_attribute.entity_type.clone()
+    } else {
+        format!("{}::{}", entity_attribute.namespace, entity_attribute.entity_type)
+    };
     info!(
         "Updating attribute '{}' on entity type='{}' id='{}'",
         entity_attribute.attribute_name,
-        entity_attribute.entity_type,
+        full_type,
         entity_attribute.entity_id
     );
     let entity = data_store
@@ -146,11 +148,11 @@ pub async fn update_entity_attribute(
     .into_iter().find(|e| {
         let uid = e.get().get("uid");
         let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(entity_attribute.entity_type.clone())).unwrap_or(false);
+        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
         id_match && type_match
     });
     if entity.is_none() {
-        return Err(AgentError::NotFound { object: "Entity", id: format!("{}::{}", entity_attribute.entity_type, entity_attribute.entity_id) });
+        return Err(AgentError::NotFound { object: "Entity", id: format!("{}::{}", full_type, entity_attribute.entity_id) });
     }
     
     let mut entity = entity.unwrap().clone();
@@ -176,7 +178,7 @@ pub async fn update_entity_attribute(
     for e in entities.iter_mut() {
         let uid = e.get().get("uid");
         let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(entity_attribute.entity_type.clone())).unwrap_or(false);
+        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
         if id_match && type_match {
             *e = entity.clone();
             break;
@@ -202,10 +204,15 @@ pub async fn delete_entity_attribute(
     schema_store: &State<Box<dyn SchemaStore>>,
     entity_attribute: Json<schemas::EntityAttribute>,
 ) -> Result<Json<schemas::Entity>, AgentError> {
+    let full_type = if entity_attribute.namespace.is_empty() {
+        entity_attribute.entity_type.clone()
+    } else {
+        format!("{}::{}", entity_attribute.namespace, entity_attribute.entity_type)
+    };
     info!(
         "Deleting attribute '{}' on entity type='{}' id='{}'",
         entity_attribute.attribute_name,
-        entity_attribute.entity_type,
+        full_type,
         entity_attribute.entity_id
     );
     let entity = data_store
@@ -215,11 +222,11 @@ pub async fn delete_entity_attribute(
         .into_iter().find(|e| {
             let uid = e.get().get("uid");
             let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-            let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(entity_attribute.entity_type.clone())).unwrap_or(false);
+            let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
             id_match && type_match
         });
     if entity.is_none() {
-        return Err(AgentError::NotFound { object: "Entity", id: format!("{}::{}", entity_attribute.entity_type, entity_attribute.entity_id) });
+        return Err(AgentError::NotFound { object: "Entity", id: format!("{}::{}", full_type, entity_attribute.entity_id) });
     }
     
     let mut entity = entity.unwrap().clone();
@@ -238,7 +245,7 @@ pub async fn delete_entity_attribute(
     entities.retain(|e| {
         let uid = e.get().get("uid");
         let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(entity_attribute.entity_type.clone())).unwrap_or(false);
+        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
         !(id_match && type_match)
     });
     entities.extend(vec![entity.clone()].into_iter());
@@ -260,9 +267,14 @@ pub async fn patch_entity_attributes(
     schema_store: &State<Box<dyn SchemaStore>>,
     update_request: Json<schemas::UpdateEntityAttributes>,
 ) -> Result<Json<schemas::Entity>, AgentError> {
+    let full_type = if update_request.namespace.is_empty() {
+        update_request.entity_type.clone()
+    } else {
+        format!("{}::{}", update_request.namespace, update_request.entity_type)
+    };
     info!(
         "Patching attributes on entity type='{}' id='{}'",
-        update_request.entity_type,
+        full_type,
         update_request.entity_id
     );
     
@@ -280,7 +292,7 @@ pub async fn patch_entity_attributes(
                 .unwrap_or(false);
             let type_match = uid
                 .and_then(|u| u.get("type"))
-                .map(|v| v == &Value::String(update_request.entity_type.clone()))
+                .map(|v| v == &Value::String(full_type.clone()))
                 .unwrap_or(false);
             id_match && type_match
         });
@@ -288,7 +300,7 @@ pub async fn patch_entity_attributes(
     if entity.is_none() {
         return Err(AgentError::NotFound {
             object: "Entity",
-            id: format!("{}::{}", update_request.entity_type, update_request.entity_id),
+            id: format!("{}::{}", full_type, update_request.entity_id),
         });
     }
     
@@ -340,7 +352,7 @@ pub async fn patch_entity_attributes(
             .unwrap_or(false);
         let type_match = uid
             .and_then(|u| u.get("type"))
-            .map(|v| v == &Value::String(update_request.entity_type.clone()))
+            .map(|v| v == &Value::String(full_type.clone()))
             .unwrap_or(false);
         if id_match && type_match {
             *e = entity.clone();
@@ -427,12 +439,25 @@ pub async fn update_single_data_entry(
     let schema = schema_store.get_cedar_schema().await;
     let new_entity = entities.into_inner().into_iter().last().unwrap();
     debug!("Received entity: {:#?}", new_entity);
-    // Ensure the provided entity's uid.id matches the path id
+    // Ensure the provided entity's uid.id or full UID matches the path id
     if let Some(uid) = new_entity.get().get("uid") {
-        if let Some(id) = uid.get("id").and_then(|v| v.as_str()) {
-            if id != entity_id {
-                return Err(AgentError::BadRequest { reason: format!("Entity id in payload ('{}') does not match path id ('{}')", id, entity_id) });
+        let payload_id = uid.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let payload_type = uid.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let full_payload_uid = format!("{}::\"{}\"", payload_type, payload_id);
+
+        let mut matched = payload_id == entity_id || full_payload_uid == entity_id;
+        
+        if !matched {
+            // Try robust comparison by parsing path entity_id as a Cedar UID
+            if let Ok(path_uid) = EntityUid::from_str(&entity_id) {
+                if path_uid.to_string() == full_payload_uid {
+                    matched = true;
+                }
             }
+        }
+
+        if !matched {
+            return Err(AgentError::BadRequest { reason: format!("Entity id/UID in payload ('{}' / '{}') does not match path id ('{}')", payload_id, full_payload_uid, entity_id) });
         }
     }
     let existing_entities = data_store.get_entities().await;
@@ -484,8 +509,21 @@ pub async fn delete_single_data_entry(
     let original_len = existing_entities.len();
     let mut entities = existing_entities.clone();
     entities.retain(|e| {
-        if let Some(uid) = e.get().get("uid").and_then(|uid| uid.get("id")) {
-            return uid != &Value::String(entity_id.clone());
+        if let Some(uid) = e.get().get("uid") {
+            let payload_id = uid.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            let payload_type = uid.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let full_payload_uid = format!("{}::\"{}\"", payload_type, payload_id);
+
+            if entity_id == payload_id || entity_id == full_payload_uid {
+                return false;
+            }
+
+            // Try robust comparison by parsing path entity_id as a Cedar UID
+            if let Ok(path_uid) = EntityUid::from_str(&entity_id) {
+                if path_uid.to_string() == full_payload_uid {
+                    return false;
+                }
+            }
         }
         true
     });

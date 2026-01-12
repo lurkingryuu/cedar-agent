@@ -31,6 +31,7 @@ pub fn create_entity_with_attrs(entity_type: &str, entity_id: &str, attrs: Value
 pub fn new_entity(entity_type: &str, entity_id: &str) -> NewEntity {
     NewEntity {
         entity_type: entity_type.to_string(),
+        namespace: "".to_string(),
         entity_id: entity_id.to_string(),
     }
 }
@@ -44,6 +45,7 @@ pub fn entity_attr_with_value(
 ) -> EntityAttributeWithValue {
     EntityAttributeWithValue {
         entity_type: entity_type.to_string(),
+        namespace: "".to_string(),
         entity_id: entity_id.to_string(),
         attribute_name: attr_name.to_string(),
         attribute_value: attr_value.to_string(),
@@ -58,9 +60,69 @@ pub fn entity_attr(
 ) -> EntityAttribute {
     EntityAttribute {
         entity_type: entity_type.to_string(),
+        namespace: "".to_string(),
         entity_id: entity_id.to_string(),
         attribute_name: attr_name.to_string(),
     }
+}
+
+/// Helper to create NewEntity with explicit namespace
+pub fn new_entity_with_namespace(entity_type: &str, entity_id: &str, namespace: &str) -> NewEntity {
+    NewEntity {
+        entity_type: entity_type.to_string(),
+        namespace: namespace.to_string(),
+        entity_id: entity_id.to_string(),
+    }
+}
+
+/// Helper to create EntityAttributeWithValue with explicit namespace
+pub fn entity_attr_with_value_with_namespace(
+    entity_type: &str,
+    entity_id: &str,
+    attr_name: &str,
+    attr_value: &str,
+    namespace: &str,
+) -> EntityAttributeWithValue {
+    EntityAttributeWithValue {
+        entity_type: entity_type.to_string(),
+        namespace: namespace.to_string(),
+        entity_id: entity_id.to_string(),
+        attribute_name: attr_name.to_string(),
+        attribute_value: attr_value.to_string(),
+    }
+}
+
+/// Helper to create EntityAttribute with explicit namespace
+pub fn entity_attr_with_namespace(
+    entity_type: &str,
+    entity_id: &str,
+    attr_name: &str,
+    namespace: &str,
+) -> EntityAttribute {
+    EntityAttribute {
+        entity_type: entity_type.to_string(),
+        namespace: namespace.to_string(),
+        entity_id: entity_id.to_string(),
+        attribute_name: attr_name.to_string(),
+    }
+}
+
+/// Helper to create entity with attributes and namespace
+pub fn create_entity_with_attrs_and_namespace(entity_type: &str, entity_id: &str, namespace: &str, attrs: Value) -> Entity {
+    let full_type = if namespace.is_empty() {
+        entity_type.to_string()
+    } else {
+        format!("{}::{}", namespace, entity_type)
+    };
+
+    Entity::from(json!({
+        "uid": {
+            "id": entity_id,
+            "type": full_type,
+        },
+        "attrs": attrs,
+        "parents": []
+    }))
 }
 
 /// Sample valid policy

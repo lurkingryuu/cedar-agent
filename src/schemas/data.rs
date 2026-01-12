@@ -168,6 +168,8 @@ impl Entities {
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct EntityAttributeWithValue {
     pub entity_type: String,
+    #[serde(default)]
+    pub namespace: String,
     pub entity_id: String,
     pub attribute_name: String,
     pub attribute_value: String,
@@ -176,6 +178,8 @@ pub struct EntityAttributeWithValue {
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct EntityAttribute {
     pub entity_type: String,
+    #[serde(default)]
+    pub namespace: String,
     pub entity_id: String,
     pub attribute_name: String,
 }
@@ -183,12 +187,16 @@ pub struct EntityAttribute {
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct NewEntity {
     pub entity_type: String,
+    #[serde(default)]
+    pub namespace: String,
     pub entity_id: String
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct UpdateEntityAttributes {
     pub entity_type: String,
+    #[serde(default)]
+    pub namespace: String,
     pub entity_id: String,
     pub attributes: std::collections::HashMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
