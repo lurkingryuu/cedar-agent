@@ -11,7 +11,8 @@ use std::str::FromStr;
 use crate::authn::ApiKey;
 use crate::errors::response::AgentError;
 use crate::schemas::data as schemas;
-use crate::{DataStore, SchemaStore};
+use crate::services::data::DataStore;
+use crate::services::schema::SchemaStore;
 use log::{debug, info, warn};
 
 #[openapi]

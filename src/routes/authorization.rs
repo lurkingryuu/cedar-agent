@@ -9,7 +9,8 @@ use rocket_okapi::openapi;
 use crate::authn::ApiKey;
 use crate::errors::response::AgentError;
 use crate::schemas::authorization::{AuthorizationAnswer, AuthorizationCall, AuthorizationRequest};
-use crate::{DataStore, PolicyStore};
+use crate::services::data::DataStore;
+use crate::services::policies::PolicyStore;
 
 #[openapi]
 #[post("/is_authorized", format = "json", data = "<authorization_call>")]

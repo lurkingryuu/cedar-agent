@@ -1,16 +1,11 @@
 use std::borrow::Borrow;
 use std::error::Error;
 
-use async_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard, Mutex};
+use async_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use async_trait::async_trait;
 use cedar_policy::Schema;
 use cedar_policy_core::entities;
 use log::{debug, error, info};
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref UPDATE_MUTEX: Mutex<()> = Mutex::new(());
-}
 
 use crate::schemas::data as schemas;
 use crate::services::data::DataStore;

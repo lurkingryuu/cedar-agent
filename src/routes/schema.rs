@@ -8,7 +8,9 @@ use crate::errors::response::AgentError;
 use crate::schemas::schema::AttributeSchema;
 use crate::schemas::schema::Schema as InternalSchema;
 use crate::schemas::schema::{DeleteAttributeSchema, GenericAttributeSchema};
-use crate::services::{data::DataStore, policies::PolicyStore, schema::SchemaStore};
+use crate::services::data::DataStore;
+use crate::services::policies::PolicyStore;
+use crate::services::schema::SchemaStore;
 use cedar_policy::Schema as CedarSchema;
 use log::{info, warn};
 

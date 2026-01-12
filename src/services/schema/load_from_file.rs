@@ -10,7 +10,7 @@ use rocket::{Build, Rocket};
 
 use crate::config;
 use crate::schemas::schema::Schema;
-use crate::services::SchemaStore;
+use crate::services::schema::SchemaStore;
 
 pub struct InitSchemaFairing;
 
