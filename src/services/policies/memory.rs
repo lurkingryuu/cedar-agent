@@ -4,7 +4,7 @@ use std::error::Error;
 
 use async_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use async_trait::async_trait;
-use cedar_policy::{PolicySet, Schema, Validator, ValidationMode, ValidationResult};
+use cedar_policy::{PolicySet, Schema, ValidationMode, ValidationResult, Validator};
 use log::{debug, info};
 
 use crate::common;
@@ -39,18 +39,18 @@ impl Policies {
         self.1 = policy_set;
     }
 
-    fn validate_policy(policy: &cedar_policy::Policy, schema: &Option<Schema>) -> Result<(), PolicyStoreError> {
+    fn validate_policy(
+        policy: &cedar_policy::Policy,
+        schema: &Option<Schema>,
+    ) -> Result<(), PolicyStoreError> {
         match schema {
             Some(schema) => {
                 // Copy the policy into its own set to pass to a validator.
                 let mut validation_set = PolicySet::new();
                 validation_set.add(policy.clone()).unwrap();
                 let validator = Validator::new(schema.clone());
-                let validation_result = Validator::validate(
-                    &validator,
-                    &validation_set,
-                    ValidationMode::default()
-                );
+                let validation_result =
+                    Validator::validate(&validator, &validation_set, ValidationMode::default());
 
                 if ValidationResult::validation_passed(&validation_result) {
                     Ok(())
@@ -62,10 +62,9 @@ impl Policies {
                     }
                     Err(PolicyStoreError::PolicyInvalid(policy.id().to_string(), error_msg).into())
                 }
-            },
-            None => Ok(())
+            }
+            None => Ok(()),
         }
-
     }
 }
 
@@ -117,13 +116,16 @@ impl PolicyStore for MemoryPolicyStore {
     async fn create_policy(
         &self,
         policy: &Policy,
-        schema: Option<Schema>
+        schema: Option<Schema>,
     ) -> Result<Policy, Box<dyn Error>> {
         info!("Creating policy {}", policy.id);
         let mut lock = self.write().await;
         let stored_policy = lock.0.get(&policy.id);
         match stored_policy {
-            Some(_) => Err(Box::new(std::io::Error::new(std::io::ErrorKind::AlreadyExists, format!("Policy with id {} already exists", policy.id)))),
+            Some(_) => Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                format!("Policy with id {} already exists", policy.id),
+            ))),
             None => {
                 let policy: cedar_policy::Policy = match policy.try_into() {
                     Ok(p) => p,
@@ -144,14 +146,19 @@ impl PolicyStore for MemoryPolicyStore {
     async fn update_policies(
         &self,
         policies: Vec<Policy>,
-        schema: Option<Schema>
+        schema: Option<Schema>,
     ) -> Result<Vec<Policy>, Box<dyn Error>> {
         info!("Updating policies");
         let mut lock = self.write().await;
         let mut new_policies: HashMap<String, cedar_policy::Policy> = HashMap::new();
         for policy in policies {
             match new_policies.get(&policy.id) {
-                Some(_) => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::AlreadyExists, format!("Policy with id {} already exists", policy.id)))),
+                Some(_) => {
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::AlreadyExists,
+                        format!("Policy with id {} already exists", policy.id),
+                    )))
+                }
                 None => {
                     let policy: cedar_policy::Policy = match policy.borrow().try_into() {
                         Ok(p) => p,

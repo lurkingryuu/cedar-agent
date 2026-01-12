@@ -5,8 +5,8 @@ use cedar_policy::Schema;
 
 use crate::schemas::data as schemas;
 
-pub mod memory;
 pub mod load_from_file;
+pub mod memory;
 
 #[async_trait]
 pub trait DataStore: Send + Sync {

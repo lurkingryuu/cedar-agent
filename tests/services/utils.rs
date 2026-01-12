@@ -38,7 +38,9 @@ pub(crate) fn schema_valid_policy(id: Option<String>) -> Policy {
     let id = id.unwrap_or_else(|| "test".to_string());
     Policy {
         id,
-        content: "permit(principal in Role::\"Editor\",action,resource == ResourceType::\"document\");".to_string(),
+        content:
+            "permit(principal in Role::\"Editor\",action,resource == ResourceType::\"document\");"
+                .to_string(),
     }
 }
 
@@ -46,7 +48,8 @@ pub(crate) fn schema_invalid_policy(id: Option<String>) -> Policy {
     let id = id.unwrap_or_else(|| "test".to_string());
     Policy {
         id,
-        content: "permit(principal in Role::\"Editor\",action,resource == Document::\"document\");".to_string(),
+        content: "permit(principal in Role::\"Editor\",action,resource == Document::\"document\");"
+            .to_string(),
     }
 }
 

@@ -32,7 +32,7 @@ async fn main() -> ExitCode {
     let config = config::init();
     logger::init(&config);
     let server_config: rocket::figment::Figment = config.borrow().into();
-    
+
     // Configure CORS
     let cors = CorsOptions::default()
         .allowed_origins(AllowedOrigins::all())
@@ -51,7 +51,7 @@ async fn main() -> ExitCode {
         )
         .allowed_headers(AllowedHeaders::some(&["Authorization", "Content-Type"]))
         .allow_credentials(true);
-    
+
     let cors_fairing = match cors.to_cors() {
         Ok(fairing) => fairing,
         Err(err) => {
@@ -59,7 +59,7 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    
+
     let launch_result = rocket::custom(server_config)
         .attach(cors_fairing)
         .attach(common::DefaultContentType::new(ContentType::JSON))

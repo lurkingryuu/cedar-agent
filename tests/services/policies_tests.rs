@@ -1,14 +1,14 @@
-use std::str::FromStr;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use cedar_policy::PolicyId;
 
 use crate::services::utils::*;
 
+use cedar_agent::policies::load_from_file::load_policies_from_file;
 use cedar_agent::policies::memory::MemoryPolicyStore;
 use cedar_agent::schemas::policies::PolicyUpdate;
 use cedar_agent::PolicyStore;
-use cedar_agent::policies::load_from_file::load_policies_from_file;
 
 #[tokio::test]
 async fn memory_tests() {
@@ -20,10 +20,15 @@ async fn memory_tests() {
         .unwrap();
     assert_eq!(policies.len(), 1);
     let duplicate_policies = store
-        .update_policies(vec![approve_all_policy(None), approve_all_policy(None)], None)
+        .update_policies(
+            vec![approve_all_policy(None), approve_all_policy(None)],
+            None,
+        )
         .await;
     assert!(duplicate_policies.is_err());
-    let error_policies = store.update_policies(vec![parse_error_policy()], None).await;
+    let error_policies = store
+        .update_policies(vec![parse_error_policy()], None)
+        .await;
     assert!(error_policies.is_err());
 
     let created_policy = store
@@ -51,7 +56,7 @@ async fn memory_tests() {
             PolicyUpdate {
                 content: approve_admin_policy(None).content,
             },
-            None
+            None,
         )
         .await
         .unwrap();
@@ -67,7 +72,7 @@ async fn memory_tests() {
             PolicyUpdate {
                 content: parse_error_policy().content,
             },
-            None
+            None,
         )
         .await;
     assert!(error_policy.is_err());
@@ -90,7 +95,9 @@ async fn memory_tests() {
 
 #[tokio::test]
 async fn test_load_policies_from_file() {
-    let policies = load_policies_from_file(PathBuf::from("./examples/policies.json")).await.unwrap();
+    let policies = load_policies_from_file(PathBuf::from("./examples/policies.json"))
+        .await
+        .unwrap();
     assert_eq!(policies.len(), 3);
     assert_eq!(policies[0].id, "admins-policy".to_string());
 }

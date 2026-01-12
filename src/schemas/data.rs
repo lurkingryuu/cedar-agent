@@ -1,11 +1,11 @@
 use std::error::Error;
 
+use cedar_policy::Schema;
 use cedar_policy_core::entities::{
     err::EntitiesError, EntityJson, EntityJsonParser, NoEntitiesSchema, TCComputation,
 };
 use cedar_policy_core::extensions::Extensions;
 use cedar_policy_core::{ast, entities};
-use cedar_policy::Schema;
 use log::debug;
 use rocket::serde::json::serde_json::{from_str, json, to_string, Map};
 use rocket::serde::json::Value;
@@ -82,7 +82,10 @@ impl Entities {
 
     // Custom conversion function in place of a TryInto implementation
     // This is due to the extra optional argument (schema)
-    pub fn convert_to_cedar_entities(&self, schema: &Option<Schema>) -> Result<cedar_policy::Entities, EntitiesError> {
+    pub fn convert_to_cedar_entities(
+        &self,
+        schema: &Option<Schema>,
+    ) -> Result<cedar_policy::Entities, EntitiesError> {
         debug!("Parsing entities into cedar format");
         cedar_policy::Entities::from_json_value(json!(self.0), schema.as_ref())
     }
@@ -163,8 +166,6 @@ impl Entities {
     }
 }
 
-
-
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 pub struct EntityAttributeWithValue {
     pub entity_type: String,
@@ -189,7 +190,7 @@ pub struct NewEntity {
     pub entity_type: String,
     #[serde(default)]
     pub namespace: String,
-    pub entity_id: String
+    pub entity_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]

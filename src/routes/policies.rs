@@ -58,21 +58,17 @@ pub async fn create_policy(
         Err(e) => {
             if let Some(policy_store_error) = e.downcast_ref::<PolicyStoreError>() {
                 match policy_store_error {
-                    PolicyStoreError::PolicyInvalid(_, reason) => {
-                        Err(AgentError::BadRequest {
-                            reason: reason.clone()
-                        })
-                    }
+                    PolicyStoreError::PolicyInvalid(_, reason) => Err(AgentError::BadRequest {
+                        reason: reason.clone(),
+                    }),
                     PolicyStoreError::PolicyParseError(parse_errors) => {
                         Err(AgentError::BadRequest {
-                            reason: format!("Policy parsing failed: {}", parse_errors)
+                            reason: format!("Policy parsing failed: {}", parse_errors),
                         })
                     }
-                    _ => {
-                        Err(AgentError::BadRequest {
-                            reason: format!("Policy error: {}", policy_store_error)
-                        })
-                    }
+                    _ => Err(AgentError::BadRequest {
+                        reason: format!("Policy error: {}", policy_store_error),
+                    }),
                 }
             } else {
                 warn!("Duplicate policy detected while creating");
@@ -81,7 +77,7 @@ pub async fn create_policy(
                     object: "policy",
                 })
             }
-        },
+        }
     }
 }
 
@@ -96,20 +92,23 @@ pub async fn update_policies(
     let schema = schema_store.get_cedar_schema().await;
     info!("Updating policies in bulk");
 
-    let updated_policy = policy_store.update_policies(
-        policy.into_inner(),
-        schema
-    ).await;
+    let updated_policy = policy_store
+        .update_policies(policy.into_inner(), schema)
+        .await;
     match updated_policy {
         Ok(p) => Ok(Json::from(p)),
         Err(e) => {
             if let Some(policy_store_error) = e.downcast_ref::<PolicyStoreError>() {
                 match policy_store_error {
                     PolicyStoreError::PolicyInvalid(_, reason) => {
-                        return Err(AgentError::BadRequest { reason: reason.clone() });
+                        return Err(AgentError::BadRequest {
+                            reason: reason.clone(),
+                        });
                     }
                     PolicyStoreError::PolicyParseError(parse_errors) => {
-                        return Err(AgentError::BadRequest { reason: format!("Policy parsing failed: {}", parse_errors) });
+                        return Err(AgentError::BadRequest {
+                            reason: format!("Policy parsing failed: {}", parse_errors),
+                        });
                     }
                     _ => {}
                 }
@@ -124,11 +123,16 @@ pub async fn update_policies(
                         .and_then(|s| s.strip_suffix(" already exists"))
                         .unwrap_or("")
                         .to_string();
-                    return Err(AgentError::Duplicate { object: "policy", id: dup_id });
+                    return Err(AgentError::Duplicate {
+                        object: "policy",
+                        id: dup_id,
+                    });
                 }
             }
-            Err(AgentError::BadRequest { reason: e.to_string() })
-        },
+            Err(AgentError::BadRequest {
+                reason: e.to_string(),
+            })
+        }
     }
 }
 
@@ -144,11 +148,9 @@ pub async fn update_policy(
     let schema = schema_store.get_cedar_schema().await;
     info!("Updating policy with id='{}'", id);
 
-    let updated_policy = policy_store.update_policy(
-        id,
-        policy.into_inner(),
-        schema
-    ).await;
+    let updated_policy = policy_store
+        .update_policy(id, policy.into_inner(), schema)
+        .await;
 
     match updated_policy {
         Ok(p) => Ok(Json::from(p)),
@@ -156,16 +158,22 @@ pub async fn update_policy(
             if let Some(policy_store_error) = e.downcast_ref::<PolicyStoreError>() {
                 match policy_store_error {
                     PolicyStoreError::PolicyInvalid(_, reason) => {
-                        return Err(AgentError::BadRequest { reason: reason.clone() });
+                        return Err(AgentError::BadRequest {
+                            reason: reason.clone(),
+                        });
                     }
                     PolicyStoreError::PolicyParseError(parse_errors) => {
-                        return Err(AgentError::BadRequest { reason: format!("Policy parsing failed: {}", parse_errors) });
+                        return Err(AgentError::BadRequest {
+                            reason: format!("Policy parsing failed: {}", parse_errors),
+                        });
                     }
                     _ => {}
                 }
             }
-            Err(AgentError::BadRequest { reason: e.to_string() })
-        },
+            Err(AgentError::BadRequest {
+                reason: e.to_string(),
+            })
+        }
     }
 }
 

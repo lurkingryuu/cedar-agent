@@ -95,10 +95,11 @@ impl DataStore for MemoryDataStore {
             }
         };
         let schema_entities: schemas::Entities = core_entities.clone().into();
-        let cedar_entities: cedar_policy::Entities = match schema_entities.borrow().convert_to_cedar_entities(&schema) {
-            Ok(entities) => entities,
-            Err(err) => return Err(err.into()),
-        };
+        let cedar_entities: cedar_policy::Entities =
+            match schema_entities.borrow().convert_to_cedar_entities(&schema) {
+                Ok(entities) => entities,
+                Err(err) => return Err(err.into()),
+            };
         *lock = Entities::new(cedar_entities, core_entities);
         Ok(schema_entities)
     }

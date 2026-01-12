@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
+use cedar_agent::data::memory::MemoryDataStore;
+use cedar_agent::policies::memory::MemoryPolicyStore;
 use cedar_agent::schema::load_from_file::load_schema_from_file;
 use cedar_agent::schema::memory::MemorySchemaStore;
-use cedar_agent::policies::memory::MemoryPolicyStore;
-use cedar_agent::data::memory::MemoryDataStore;
-use cedar_agent::{SchemaStore, PolicyStore, DataStore};
+use cedar_agent::{DataStore, PolicyStore, SchemaStore};
 
 use crate::services::utils;
 
@@ -42,8 +42,9 @@ async fn test_validate_policy() {
     let valid_policies = policy_store
         .update_policies(
             vec![utils::schema_valid_policy(Some("valid".to_string()))],
-            schema_store.get_cedar_schema().await
-        ).await;
+            schema_store.get_cedar_schema().await,
+        )
+        .await;
     assert!(!valid_policies.is_err());
 
     let policies = valid_policies.unwrap();
@@ -53,8 +54,9 @@ async fn test_validate_policy() {
     let invalid_policies = policy_store
         .update_policies(
             vec![utils::schema_invalid_policy(Some("invalid".to_string()))],
-            schema_store.get_cedar_schema().await
-        ).await;
+            schema_store.get_cedar_schema().await,
+        )
+        .await;
     assert!(invalid_policies.is_err());
 }
 
@@ -65,17 +67,16 @@ async fn test_validate_entities() {
     schema_store.update_schema(utils::schema()).await.unwrap();
 
     let valid_entities = data_store
-        .update_entities(
-            utils::entities(),
-            schema_store.get_cedar_schema().await
-        ).await;
+        .update_entities(utils::entities(), schema_store.get_cedar_schema().await)
+        .await;
     assert!(!valid_entities.is_err());
     assert_eq!(valid_entities.unwrap().len(), 8);
 
     let invalid_entities = data_store
         .update_entities(
             utils::parse_error_entities(),
-            schema_store.get_cedar_schema().await
-        ).await;
+            schema_store.get_cedar_schema().await,
+        )
+        .await;
     assert!(invalid_entities.is_err());
 }

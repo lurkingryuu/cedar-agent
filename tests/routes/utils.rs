@@ -1,7 +1,9 @@
-use rocket::serde::json::serde_json::{json, from_str, Value};
-use cedar_agent::schemas::data::{Entities, Entity, NewEntity, EntityAttributeWithValue, EntityAttribute};
+use cedar_agent::schemas::data::{
+    Entities, Entity, EntityAttribute, EntityAttributeWithValue, NewEntity,
+};
 use cedar_agent::schemas::policies::Policy;
 use cedar_agent::schemas::schema::Schema;
+use rocket::serde::json::serde_json::{from_str, json, Value};
 
 /// Helper to create a simple entity
 pub fn create_simple_entity(entity_type: &str, entity_id: &str) -> Entity {
@@ -53,11 +55,7 @@ pub fn entity_attr_with_value(
 }
 
 /// Helper to create EntityAttribute
-pub fn entity_attr(
-    entity_type: &str,
-    entity_id: &str,
-    attr_name: &str,
-) -> EntityAttribute {
+pub fn entity_attr(entity_type: &str, entity_id: &str, attr_name: &str) -> EntityAttribute {
     EntityAttribute {
         entity_type: entity_type.to_string(),
         namespace: "".to_string(),
@@ -108,7 +106,12 @@ pub fn entity_attr_with_namespace(
 }
 
 /// Helper to create entity with attributes and namespace
-pub fn create_entity_with_attrs_and_namespace(entity_type: &str, entity_id: &str, namespace: &str, attrs: Value) -> Entity {
+pub fn create_entity_with_attrs_and_namespace(
+    entity_type: &str,
+    entity_id: &str,
+    namespace: &str,
+    attrs: Value,
+) -> Entity {
     let full_type = if namespace.is_empty() {
         entity_type.to_string()
     } else {
@@ -254,4 +257,3 @@ pub fn invalid_entities_for_schema() -> Entities {
     "#;
     from_str(entities_json).unwrap()
 }
-

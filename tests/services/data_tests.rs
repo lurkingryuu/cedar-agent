@@ -16,10 +16,15 @@ async fn memory_tests() {
 
     let entities = store.get_entities().await;
     assert_eq!(entities.len(), 0);
-    let updated_entities = store.update_entities(utils::entities(), None).await.unwrap();
+    let updated_entities = store
+        .update_entities(utils::entities(), None)
+        .await
+        .unwrap();
     assert_eq!(updated_entities.len(), 8);
 
-    let error_entities = store.update_entities(utils::parse_error_entities(), None).await;
+    let error_entities = store
+        .update_entities(utils::parse_error_entities(), None)
+        .await;
     assert!(error_entities.is_err());
     store.delete_entities().await;
     let entities = store.get_entities().await;
@@ -36,7 +41,6 @@ async fn test_load_entities_from_file() {
 
 #[tokio::test]
 async fn test_load_empty_entities_from_authz_call() {
-
     let entities: String = String::from("[]");
 
     let query = make_authz_call(entities);
@@ -49,7 +53,6 @@ async fn test_load_empty_entities_from_authz_call() {
 
 #[tokio::test]
 async fn test_load_no_entities_from_authz_call() {
-
     let query = make_authz_call_no_entities();
 
     match query {
@@ -58,10 +61,8 @@ async fn test_load_no_entities_from_authz_call() {
     };
 }
 
-
 #[tokio::test]
 async fn test_load_entities_from_authz_call() {
-
     let entities: String = r#"
     [
         {
@@ -94,13 +95,13 @@ async fn test_load_entities_from_authz_call() {
     match query {
         Ok(req) => {
             assert_ne!(req.get_entities(), None);
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     };
 }
 
 #[tokio::test]
-async fn test_combine_entities_with_additional_entities(){
+async fn test_combine_entities_with_additional_entities() {
     let stored_entities: String = r#"
     [
         {
@@ -139,7 +140,8 @@ async fn test_combine_entities_with_additional_entities(){
             }
         }
     ]
-    "#.to_string();
+    "#
+    .to_string();
 
     let expected_result: String = r#"
     [
@@ -173,20 +175,25 @@ async fn test_combine_entities_with_additional_entities(){
             }
         }
     ]
-    "#.to_string();
+    "#
+    .to_string();
 
     let query = make_authz_call_with_additional_entities(additional_entities);
 
     match query {
         Ok(req) => {
-            match req.get_request_entities(Entities::from_json_str(&stored_entities, None).unwrap()) {
+            match req.get_request_entities(Entities::from_json_str(&stored_entities, None).unwrap())
+            {
                 Ok((_request, entities)) => {
-                    assert_eq!(entities, Entities::from_json_str(&expected_result, None).unwrap())
-                },
-                _ => assert!(false)
+                    assert_eq!(
+                        entities,
+                        Entities::from_json_str(&expected_result, None).unwrap()
+                    )
+                }
+                _ => assert!(false),
             };
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     };
 }
 
@@ -195,15 +202,8 @@ fn make_authz_call_no_entities() -> Result<AuthorizationRequest, Box<dyn Error>>
     let action: Option<String> = Some("Action::\"Delete\"".to_string());
     let resource: Option<String> = Some("Document::\"cedar-agent.pdf\"".to_string());
 
-    let authorization_call = AuthorizationCall::new(
-        principal,
-        action,
-        resource,
-        None,
-        None,
-        None,
-        None,
-    );
+    let authorization_call =
+        AuthorizationCall::new(principal, action, resource, None, None, None, None);
     return authorization_call.try_into();
 }
 
@@ -225,7 +225,7 @@ fn make_authz_call(entities: String) -> Result<AuthorizationRequest, Box<dyn Err
 }
 
 fn make_authz_call_with_additional_entities(
-    additional_entities: String
+    additional_entities: String,
 ) -> Result<AuthorizationRequest, Box<dyn Error>> {
     let principal: Option<String> = Some("User::\"Test\"".to_string());
     let action: Option<String> = Some("Action::\"Delete\"".to_string());

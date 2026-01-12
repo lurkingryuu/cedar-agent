@@ -1,12 +1,12 @@
 use rocket::response::status;
 
+use cedar_policy::EntityUid;
 use rocket::serde::json::{Json, Value, *};
+use rocket::{delete, get, patch, put, State};
+use rocket_okapi::openapi;
+use serde_json::Map;
 use std::collections::HashSet;
 use std::str::FromStr;
-use serde_json::Map;
-use rocket::{delete, get, put, patch, State};
-use rocket_okapi::openapi;
-use cedar_policy::EntityUid;
 
 use crate::authn::ApiKey;
 use crate::errors::response::AgentError;
@@ -45,7 +45,10 @@ pub async fn update_entities(
                     let key = (typ_str.to_string(), id_str.to_string());
                     if !seen.insert(key.clone()) {
                         warn!("Duplicate entity detected in payload: {}::{}", key.0, key.1);
-                        return Err(AgentError::Duplicate { object: "Entity", id: format!("{}::{}", key.0, key.1) });
+                        return Err(AgentError::Duplicate {
+                            object: "Entity",
+                            id: format!("{}::{}", key.0, key.1),
+                        });
                     }
                 }
             }
@@ -85,8 +88,11 @@ pub async fn add_new_entity(
     } else {
         format!("{}::{}", entity.namespace, entity.entity_type)
     };
-    info!("Adding new entity: type='{}', id='{}'", full_type, entity.entity_id);
-    
+    info!(
+        "Adding new entity: type='{}', id='{}'",
+        full_type, entity.entity_id
+    );
+
     // create new entity from a string representation of the above format
     let new_entity = schemas::Entity::from(json!({
         "uid": {
@@ -102,12 +108,15 @@ pub async fn add_new_entity(
     // check if the entity already exists
     if existing_entities.clone().into_iter().any(|e| {
         if let Some(uid) = e.get().get("uid") {
-            return uid.get("id").unwrap() == &Value::String(entity.entity_id.clone()) &&
-                   uid.get("type").unwrap() == &Value::String(full_type.clone());
+            return uid.get("id").unwrap() == &Value::String(entity.entity_id.clone())
+                && uid.get("type").unwrap() == &Value::String(full_type.clone());
         }
         false
     }) {
-        return Err(AgentError::Duplicate { object: "Entity", id: entity.entity_id.clone() });
+        return Err(AgentError::Duplicate {
+            object: "Entity",
+            id: entity.entity_id.clone(),
+        });
     }
 
     // merge new entity with existing entities
@@ -121,7 +130,6 @@ pub async fn add_new_entity(
     }
 }
 
-
 #[openapi]
 #[put("/data/attribute", format = "json", data = "<entity_attribute>")]
 pub async fn update_entity_attribute(
@@ -133,66 +141,90 @@ pub async fn update_entity_attribute(
     let full_type = if entity_attribute.namespace.is_empty() {
         entity_attribute.entity_type.clone()
     } else {
-        format!("{}::{}", entity_attribute.namespace, entity_attribute.entity_type)
+        format!(
+            "{}::{}",
+            entity_attribute.namespace, entity_attribute.entity_type
+        )
     };
     info!(
         "Updating attribute '{}' on entity type='{}' id='{}'",
-        entity_attribute.attribute_name,
-        full_type,
-        entity_attribute.entity_id
+        entity_attribute.attribute_name, full_type, entity_attribute.entity_id
     );
     let entity = data_store
-    .inner()
-    .get_entities()
-    .await
-    .into_iter().find(|e| {
-        let uid = e.get().get("uid");
-        let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
-        id_match && type_match
-    });
+        .inner()
+        .get_entities()
+        .await
+        .into_iter()
+        .find(|e| {
+            let uid = e.get().get("uid");
+            let id_match = uid
+                .and_then(|u| u.get("id"))
+                .map(|v| v == &Value::String(entity_attribute.entity_id.clone()))
+                .unwrap_or(false);
+            let type_match = uid
+                .and_then(|u| u.get("type"))
+                .map(|v| v == &Value::String(full_type.clone()))
+                .unwrap_or(false);
+            id_match && type_match
+        });
     if entity.is_none() {
-        return Err(AgentError::NotFound { object: "Entity", id: format!("{}::{}", full_type, entity_attribute.entity_id) });
+        return Err(AgentError::NotFound {
+            object: "Entity",
+            id: format!("{}::{}", full_type, entity_attribute.entity_id),
+        });
     }
-    
+
     let mut entity = entity.unwrap().clone();
-    
+
     // Ensure the entity has an "attrs" object
     if entity.get().get("attrs").is_none() {
-        entity.get_mut().as_object_mut()
+        entity
+            .get_mut()
+            .as_object_mut()
             .and_then(|obj| obj.insert("attrs".to_string(), Value::Object(Map::new())));
     }
-    
+
     // Update the attribute value
-    if let Some(attrs) = entity.get_mut().get_mut("attrs").and_then(|attr| attr.as_object_mut()) {
-        attrs.insert(entity_attribute.attribute_name.clone(), Value::String(entity_attribute.attribute_value.clone()));
+    if let Some(attrs) = entity
+        .get_mut()
+        .get_mut("attrs")
+        .and_then(|attr| attr.as_object_mut())
+    {
+        attrs.insert(
+            entity_attribute.attribute_name.clone(),
+            Value::String(entity_attribute.attribute_value.clone()),
+        );
     }
 
     // Get all entities and update the specific one
-    let mut entities = data_store
-        .inner()
-        .get_entities()
-        .await;
-    
+    let mut entities = data_store.inner().get_entities().await;
+
     // Find and replace the entity with the updated one (match by id and type)
     for e in entities.iter_mut() {
         let uid = e.get().get("uid");
-        let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
+        let id_match = uid
+            .and_then(|u| u.get("id"))
+            .map(|v| v == &Value::String(entity_attribute.entity_id.clone()))
+            .unwrap_or(false);
+        let type_match = uid
+            .and_then(|u| u.get("type"))
+            .map(|v| v == &Value::String(full_type.clone()))
+            .unwrap_or(false);
         if id_match && type_match {
             *e = entity.clone();
             break;
         }
     }
-    
+
     // Update entities with schema validation
     data_store
         .inner()
         .update_entities(entities, schema_store.get_cedar_schema().await)
-        .await.map_err(|err| AgentError::BadRequest {
+        .await
+        .map_err(|err| AgentError::BadRequest {
             reason: err.to_string(),
         })?;
-    
+
     Ok(Json::from(entity.clone()))
 }
 
@@ -207,55 +239,80 @@ pub async fn delete_entity_attribute(
     let full_type = if entity_attribute.namespace.is_empty() {
         entity_attribute.entity_type.clone()
     } else {
-        format!("{}::{}", entity_attribute.namespace, entity_attribute.entity_type)
+        format!(
+            "{}::{}",
+            entity_attribute.namespace, entity_attribute.entity_type
+        )
     };
     info!(
         "Deleting attribute '{}' on entity type='{}' id='{}'",
-        entity_attribute.attribute_name,
-        full_type,
-        entity_attribute.entity_id
+        entity_attribute.attribute_name, full_type, entity_attribute.entity_id
     );
     let entity = data_store
         .inner()
         .get_entities()
         .await
-        .into_iter().find(|e| {
+        .into_iter()
+        .find(|e| {
             let uid = e.get().get("uid");
-            let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-            let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
+            let id_match = uid
+                .and_then(|u| u.get("id"))
+                .map(|v| v == &Value::String(entity_attribute.entity_id.clone()))
+                .unwrap_or(false);
+            let type_match = uid
+                .and_then(|u| u.get("type"))
+                .map(|v| v == &Value::String(full_type.clone()))
+                .unwrap_or(false);
             id_match && type_match
         });
     if entity.is_none() {
-        return Err(AgentError::NotFound { object: "Entity", id: format!("{}::{}", full_type, entity_attribute.entity_id) });
+        return Err(AgentError::NotFound {
+            object: "Entity",
+            id: format!("{}::{}", full_type, entity_attribute.entity_id),
+        });
     }
-    
+
     let mut entity = entity.unwrap().clone();
-    let removed = entity.get_mut().get_mut("attrs")
+    let removed = entity
+        .get_mut()
+        .get_mut("attrs")
         .and_then(|attr| attr.as_object_mut())
         .and_then(|attr| attr.remove(&entity_attribute.attribute_name));
     if removed.is_none() {
-        return Err(AgentError::NotFound { object: "Attribute", id: format!("{}::{}#{}", entity_attribute.entity_type, entity_attribute.entity_id, entity_attribute.attribute_name) });
+        return Err(AgentError::NotFound {
+            object: "Attribute",
+            id: format!(
+                "{}::{}#{}",
+                entity_attribute.entity_type,
+                entity_attribute.entity_id,
+                entity_attribute.attribute_name
+            ),
+        });
     }
 
-    let entities = data_store
-        .inner()
-        .get_entities()
-        .await;
+    let entities = data_store.inner().get_entities().await;
     let mut entities = entities.clone();
     entities.retain(|e| {
         let uid = e.get().get("uid");
-        let id_match = uid.and_then(|u| u.get("id")).map(|v| v == &Value::String(entity_attribute.entity_id.clone())).unwrap_or(false);
-        let type_match = uid.and_then(|u| u.get("type")).map(|v| v == &Value::String(full_type.clone())).unwrap_or(false);
+        let id_match = uid
+            .and_then(|u| u.get("id"))
+            .map(|v| v == &Value::String(entity_attribute.entity_id.clone()))
+            .unwrap_or(false);
+        let type_match = uid
+            .and_then(|u| u.get("type"))
+            .map(|v| v == &Value::String(full_type.clone()))
+            .unwrap_or(false);
         !(id_match && type_match)
     });
     entities.extend(vec![entity.clone()].into_iter());
     data_store
         .inner()
         .update_entities(entities, schema_store.get_cedar_schema().await)
-        .await.map_err(|err| AgentError::BadRequest {
+        .await
+        .map_err(|err| AgentError::BadRequest {
             reason: err.to_string(),
         })?;
-    
+
     Ok(Json::from(entity.clone()))
 }
 
@@ -270,14 +327,16 @@ pub async fn patch_entity_attributes(
     let full_type = if update_request.namespace.is_empty() {
         update_request.entity_type.clone()
     } else {
-        format!("{}::{}", update_request.namespace, update_request.entity_type)
+        format!(
+            "{}::{}",
+            update_request.namespace, update_request.entity_type
+        )
     };
     info!(
         "Patching attributes on entity type='{}' id='{}'",
-        full_type,
-        update_request.entity_id
+        full_type, update_request.entity_id
     );
-    
+
     // Find the entity
     let entity = data_store
         .inner()
@@ -296,16 +355,16 @@ pub async fn patch_entity_attributes(
                 .unwrap_or(false);
             id_match && type_match
         });
-    
+
     if entity.is_none() {
         return Err(AgentError::NotFound {
             object: "Entity",
             id: format!("{}::{}", full_type, update_request.entity_id),
         });
     }
-    
+
     let mut entity = entity.unwrap().clone();
-    
+
     // Ensure the entity has an "attrs" object
     if entity.get().get("attrs").is_none() {
         entity
@@ -313,7 +372,7 @@ pub async fn patch_entity_attributes(
             .as_object_mut()
             .and_then(|obj| obj.insert("attrs".to_string(), Value::Object(Map::new())));
     }
-    
+
     // Update all attributes from the request
     if let Some(attrs) = entity
         .get_mut()
@@ -324,10 +383,11 @@ pub async fn patch_entity_attributes(
             attrs.insert(attr_name.clone(), Value::String(attr_value.clone()));
         }
     }
-    
+
     // Update parents if provided
     if let Some(new_parents) = &update_request.parents {
-        let parents_array: Vec<Value> = new_parents.iter()
+        let parents_array: Vec<Value> = new_parents
+            .iter()
             .map(|parent_map| {
                 let mut parent_obj = Map::new();
                 for (k, v) in parent_map {
@@ -336,13 +396,15 @@ pub async fn patch_entity_attributes(
                 Value::Object(parent_obj)
             })
             .collect();
-        entity.get_mut().as_object_mut()
+        entity
+            .get_mut()
+            .as_object_mut()
             .and_then(|obj| obj.insert("parents".to_string(), Value::Array(parents_array)));
     }
-    
+
     // Get all entities and update the specific one
     let mut entities = data_store.inner().get_entities().await;
-    
+
     // Find and replace the entity with the updated one (match by id and type)
     for e in entities.iter_mut() {
         let uid = e.get().get("uid");
@@ -359,7 +421,7 @@ pub async fn patch_entity_attributes(
             break;
         }
     }
-    
+
     // Update entities with schema validation (no duplicate check - this is for updating existing entities)
     data_store
         .inner()
@@ -368,12 +430,11 @@ pub async fn patch_entity_attributes(
         .map_err(|err| AgentError::BadRequest {
             reason: err.to_string(),
         })?;
-    
+
     Ok(Json::from(entity.clone()))
 }
 
-
-/* 
+/*
 
 */
 #[openapi]
@@ -387,7 +448,9 @@ pub async fn add_single_data_entry(
     let schema = schema_store.get_cedar_schema().await;
     info!("Adding a single entity entry");
     if entities.len() != 1 {
-        return Err(AgentError::BadRequest { reason: "Exactly one entity is required".to_string() });
+        return Err(AgentError::BadRequest {
+            reason: "Exactly one entity is required".to_string(),
+        });
     }
     let new_entity = entities.into_inner().into_iter().last().unwrap();
     let existing_entities = data_store.get_entities().await;
@@ -398,13 +461,19 @@ pub async fn add_single_data_entry(
             if let (Some(id_str), Some(typ_str)) = (id.as_str(), typ.as_str()) {
                 if existing_entities.clone().into_iter().any(|e| {
                     if let Some(euid) = e.get().get("uid") {
-                        return euid.get("id") == Some(&Value::String(id_str.to_string())) &&
-                               euid.get("type") == Some(&Value::String(typ_str.to_string()));
+                        return euid.get("id") == Some(&Value::String(id_str.to_string()))
+                            && euid.get("type") == Some(&Value::String(typ_str.to_string()));
                     }
                     false
                 }) {
-                    warn!("Duplicate entity detected when adding single entry: {}::{}", typ_str, id_str);
-                    return Err(AgentError::Duplicate { object: "Entity", id: format!("{}::{}", typ_str, id_str) });
+                    warn!(
+                        "Duplicate entity detected when adding single entry: {}::{}",
+                        typ_str, id_str
+                    );
+                    return Err(AgentError::Duplicate {
+                        object: "Entity",
+                        id: format!("{}::{}", typ_str, id_str),
+                    });
                 }
             }
         }
@@ -413,7 +482,7 @@ pub async fn add_single_data_entry(
     // merge new entities with existing entities
     let mut entities = existing_entities.clone();
     entities.extend(vec![new_entity].into_iter());
- 
+
     match data_store.update_entities(entities, schema).await {
         Ok(entities) => Ok(Json::from(entities)),
         Err(err) => Err(AgentError::BadRequest {
@@ -429,11 +498,13 @@ pub async fn update_single_data_entry(
     data_store: &State<Box<dyn DataStore>>,
     schema_store: &State<Box<dyn SchemaStore>>,
     entity_id: String,
-    entities: Json<schemas::Entities>
+    entities: Json<schemas::Entities>,
 ) -> Result<Json<schemas::Entity>, AgentError> {
     debug!("Updating single data entry with id: {}", entity_id);
     if entities.len() != 1 {
-        return Err(AgentError::BadRequest { reason: "Only one entity can be updated at a time".to_string() });
+        return Err(AgentError::BadRequest {
+            reason: "Only one entity can be updated at a time".to_string(),
+        });
     }
 
     let schema = schema_store.get_cedar_schema().await;
@@ -446,7 +517,7 @@ pub async fn update_single_data_entry(
         let full_payload_uid = format!("{}::\"{}\"", payload_type, payload_id);
 
         let mut matched = payload_id == entity_id || full_payload_uid == entity_id;
-        
+
         if !matched {
             // Try robust comparison by parsing path entity_id as a Cedar UID
             if let Ok(path_uid) = EntityUid::from_str(&entity_id) {
@@ -457,7 +528,12 @@ pub async fn update_single_data_entry(
         }
 
         if !matched {
-            return Err(AgentError::BadRequest { reason: format!("Entity id/UID in payload ('{}' / '{}') does not match path id ('{}')", payload_id, full_payload_uid, entity_id) });
+            return Err(AgentError::BadRequest {
+                reason: format!(
+                    "Entity id/UID in payload ('{}' / '{}') does not match path id ('{}')",
+                    payload_id, full_payload_uid, entity_id
+                ),
+            });
         }
     }
     let existing_entities = data_store.get_entities().await;
@@ -468,13 +544,19 @@ pub async fn update_single_data_entry(
             if let (Some(id_str), Some(typ_str)) = (id.as_str(), typ.as_str()) {
                 if existing_entities.clone().into_iter().any(|e| {
                     if let Some(euid) = e.get().get("uid") {
-                        return euid.get("id") == Some(&Value::String(id_str.to_string())) &&
-                               euid.get("type") == Some(&Value::String(typ_str.to_string()));
+                        return euid.get("id") == Some(&Value::String(id_str.to_string()))
+                            && euid.get("type") == Some(&Value::String(typ_str.to_string()));
                     }
                     false
                 }) {
-                    warn!("Duplicate entity detected when updating single entry: {}::{}", typ_str, id_str);
-                    return Err(AgentError::Duplicate { object: "Entity", id: format!("{}::{}", typ_str, id_str) });
+                    warn!(
+                        "Duplicate entity detected when updating single entry: {}::{}",
+                        typ_str, id_str
+                    );
+                    return Err(AgentError::Duplicate {
+                        object: "Entity",
+                        id: format!("{}::{}", typ_str, id_str),
+                    });
                 }
             }
         }
@@ -483,9 +565,9 @@ pub async fn update_single_data_entry(
     // Entity doesn't exist, add it as new
     let mut entities = existing_entities.clone();
     entities.extend(vec![new_entity.clone()].into_iter());
-    
+
     debug!("Creating new entity: {:#?}", new_entity);
- 
+
     // Persist the new entity to the data store
     match data_store.update_entities(entities, schema).await {
         Ok(_) => Ok(Json::from(new_entity)),
@@ -528,7 +610,10 @@ pub async fn delete_single_data_entry(
         true
     });
     if entities.len() == original_len {
-        return Err(AgentError::NotFound { object: "Entity", id: entity_id });
+        return Err(AgentError::NotFound {
+            object: "Entity",
+            id: entity_id,
+        });
     }
 
     match data_store.update_entities(entities, schema).await {

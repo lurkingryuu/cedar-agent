@@ -64,7 +64,7 @@ impl Config {
             log_level: None,
             data: None,
             policies: None,
-            schema: None
+            schema: None,
         }
     }
 

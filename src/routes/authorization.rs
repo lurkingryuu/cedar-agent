@@ -30,7 +30,7 @@ pub async fn is_authorized(
             warn!("Invalid authorization request: {}", err);
             return Err(AgentError::BadRequest {
                 reason: err.to_string(),
-            })
+            });
         }
     };
 
@@ -39,11 +39,11 @@ pub async fn is_authorized(
     let stored_entities = data_store.entities().await;
     let (request, entities) = match query.get_request_entities(stored_entities) {
         Ok(result) => result,
-        Err(err)=> {
+        Err(err) => {
             warn!("Failed to build request/entities: {}", err);
             return Err(AgentError::BadRequest {
                 reason: err.to_string(),
-            })
+            });
         }
     };
 

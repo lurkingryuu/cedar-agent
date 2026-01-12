@@ -13,5 +13,5 @@ pub enum PolicyStoreError {
     PolicyNotFoundError(String),
     /// Validation returned an error.
     #[error("Failed validating policy {0} against the schema: {1}")]
-    PolicyInvalid(String, String)
+    PolicyInvalid(String, String),
 }

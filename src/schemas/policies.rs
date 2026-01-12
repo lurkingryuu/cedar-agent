@@ -1,8 +1,8 @@
-use std::str::FromStr;
 use log::debug;
 use rocket_okapi::okapi::schemars;
 use rocket_okapi::okapi::schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Policy {
     pub id: String,
@@ -23,7 +23,10 @@ impl TryInto<cedar_policy::Policy> for &Policy {
 
     fn try_into(self) -> Result<cedar_policy::Policy, Self::Error> {
         debug!("Parsing policy");
-        cedar_policy::Policy::parse(Some(cedar_policy::PolicyId::from_str(&self.id).unwrap()), self.content.clone())
+        cedar_policy::Policy::parse(
+            Some(cedar_policy::PolicyId::from_str(&self.id).unwrap()),
+            self.content.clone(),
+        )
     }
 }
 

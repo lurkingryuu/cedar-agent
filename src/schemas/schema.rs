@@ -2,8 +2,8 @@ use cedar_policy;
 use log::debug;
 use serde::{Deserialize, Serialize};
 
-use rocket::serde::json::Value;
 use rocket::serde::json::serde_json::Map;
+use rocket::serde::json::Value;
 use rocket_okapi::okapi::schemars;
 use rocket_okapi::okapi::schemars::JsonSchema;
 
@@ -42,14 +42,12 @@ impl From<Value> for Schema {
     }
 }
 
-
 #[derive(Debug, Clone, JsonSchema)]
 pub enum AttributeType {
     String,
     Long,
     Boolean,
-    
-    // ::Unsupported 
+    // ::Unsupported
     // Record,
     // Set,
     // Entity,
@@ -82,7 +80,10 @@ impl<'de> Deserialize<'de> for AttributeType {
             "Long" => Ok(AttributeType::Long),
             "Boolean" => Ok(AttributeType::Boolean),
             // "Unsupported" => Ok(AttributeType::Unsupported),
-            _ => Err(serde::de::Error::custom(format!("Unknown attribute type: {}", s))),
+            _ => Err(serde::de::Error::custom(format!(
+                "Unknown attribute type: {}",
+                s
+            ))),
         }
     }
 }

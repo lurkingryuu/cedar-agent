@@ -1,22 +1,22 @@
-use rocket::{delete, get, put, post, State};
 use rocket::response::status;
 use rocket::serde::json::{json, Json};
+use rocket::{delete, get, post, put, State};
 use rocket_okapi::openapi;
 
 use crate::authn::ApiKey;
 use crate::errors::response::AgentError;
-use cedar_policy::Schema as CedarSchema;
-use crate::schemas::schema::Schema as InternalSchema;
 use crate::schemas::schema::AttributeSchema;
-use crate::schemas::schema::{GenericAttributeSchema, DeleteAttributeSchema};
-use crate::services::{schema::SchemaStore, policies::PolicyStore, data::DataStore};
+use crate::schemas::schema::Schema as InternalSchema;
+use crate::schemas::schema::{DeleteAttributeSchema, GenericAttributeSchema};
+use crate::services::{data::DataStore, policies::PolicyStore, schema::SchemaStore};
+use cedar_policy::Schema as CedarSchema;
 use log::{info, warn};
 
 #[openapi]
 #[get("/schema")]
 pub async fn get_schema(
     _auth: ApiKey,
-    schema_store: &State<Box<dyn SchemaStore>>
+    schema_store: &State<Box<dyn SchemaStore>>,
 ) -> Result<Json<InternalSchema>, AgentError> {
     info!("Fetching schema");
     Ok(Json::from(schema_store.get_internal_schema().await))
@@ -29,37 +29,49 @@ pub async fn update_schema(
     schema_store: &State<Box<dyn SchemaStore>>,
     policy_store: &State<Box<dyn PolicyStore>>,
     data_store: &State<Box<dyn DataStore>>,
-    schema: Json<InternalSchema>
+    schema: Json<InternalSchema>,
 ) -> Result<Json<InternalSchema>, AgentError> {
     info!("Updating schema");
     let cedar_schema: CedarSchema = match schema.clone().into_inner().try_into() {
         Ok(schema) => schema,
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     };
 
     let current_policies = policy_store.get_policies().await;
-    match policy_store.update_policies(current_policies, Some(cedar_schema.clone())).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing policies invalid with the new schema: {}", err),
-        })
+    match policy_store
+        .update_policies(current_policies, Some(cedar_schema.clone()))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing policies invalid with the new schema: {}", err),
+            })
+        }
     }
 
     let current_entities = data_store.get_entities().await;
-    match data_store.update_entities(current_entities, Some(cedar_schema)).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing entities invalid with the new schema: {}", err),
-        })
+    match data_store
+        .update_entities(current_entities, Some(cedar_schema))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing entities invalid with the new schema: {}", err),
+            })
+        }
     }
 
     match schema_store.update_schema(schema.into_inner()).await {
         Ok(schema) => Ok(Json::from(schema)),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
-        })
+        }),
     }
 }
 
@@ -67,7 +79,7 @@ pub async fn update_schema(
 #[delete("/schema")]
 pub async fn delete_schema(
     _auth: ApiKey,
-    schema_store: &State<Box<dyn SchemaStore>>
+    schema_store: &State<Box<dyn SchemaStore>>,
 ) -> Result<status::NoContent, AgentError> {
     info!("Deleting schema");
     schema_store.delete_schema().await;
@@ -84,13 +96,7 @@ pub async fn add_user_attribute(
     attr: Json<AttributeSchema>,
 ) -> Result<Json<InternalSchema>, AgentError> {
     info!("Adding attribute to User: '{}'", attr.get_name());
-    add_entity_attribute(
-        "User",
-        attr,
-        schema_store,
-        policy_store,
-        data_store,
-    ).await
+    add_entity_attribute("User", attr, schema_store, policy_store, data_store).await
 }
 
 #[openapi]
@@ -103,15 +109,8 @@ pub async fn add_table_attribute(
     attr: Json<AttributeSchema>,
 ) -> Result<Json<InternalSchema>, AgentError> {
     info!("Adding attribute to Table: '{}'", attr.get_name());
-    add_entity_attribute(
-        "Table",
-        attr,
-        schema_store,
-        policy_store,
-        data_store,
-    ).await
+    add_entity_attribute("Table", attr, schema_store, policy_store, data_store).await
 }
-
 
 #[openapi]
 #[delete("/schema/user/attribute/<attr_name>")]
@@ -124,7 +123,9 @@ pub async fn delete_user_attribute(
 ) -> Result<status::NoContent, AgentError> {
     info!("Deleting User attribute '{}'", attr_name);
     let mut schema = schema_store.get_internal_schema().await;
-    let something = schema.get_mut().get_mut("")
+    let something = schema
+        .get_mut()
+        .get_mut("")
         .and_then(|v| v.get_mut("entityTypes"))
         .and_then(|v| v.get_mut("User"))
         .and_then(|v| v.get_mut("shape"))
@@ -137,41 +138,55 @@ pub async fn delete_user_attribute(
             reason: "Entity type 'User' not found in schema".to_string(),
         })?;
     if something.remove(&attr_name).is_none() {
-        return Err(AgentError::NotFound { object: "Attribute", id: format!("User::{}", attr_name) });
+        return Err(AgentError::NotFound {
+            object: "Attribute",
+            id: format!("User::{}", attr_name),
+        });
     }
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
         Ok(schema) => schema,
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     };
 
     let current_policies = policy_store.get_policies().await;
-    match policy_store.update_policies(current_policies, Some(cedar_schema.clone())).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing policies invalid with the new schema: {}", err),
-        })
+    match policy_store
+        .update_policies(current_policies, Some(cedar_schema.clone()))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing policies invalid with the new schema: {}", err),
+            })
+        }
     }
     // validate the new schema with the current entities
     let current_entities = data_store.get_entities().await;
-    match data_store.update_entities(current_entities, Some(cedar_schema)).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing entities invalid with the new schema: {}", err),
-        })
+    match data_store
+        .update_entities(current_entities, Some(cedar_schema))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing entities invalid with the new schema: {}", err),
+            })
+        }
     }
     // update the schema in the store
     match schema_store.update_schema(schema).await {
         Ok(_) => Ok(status::NoContent),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
-        })
+        }),
     }
 }
-
 
 #[openapi]
 #[delete("/schema/resource/attribute/<attr_name>")]
@@ -184,7 +199,9 @@ pub async fn delete_table_attribute(
 ) -> Result<status::NoContent, AgentError> {
     info!("Deleting Table attribute '{}'", attr_name);
     let mut schema = schema_store.get_internal_schema().await;
-    let something = schema.get_mut().get_mut("")
+    let something = schema
+        .get_mut()
+        .get_mut("")
         .and_then(|v| v.get_mut("entityTypes"))
         .and_then(|v| v.get_mut("Table"))
         .and_then(|v| v.get_mut("shape"))
@@ -197,31 +214,46 @@ pub async fn delete_table_attribute(
             reason: "Entity type 'Table' not found in schema".to_string(),
         })?;
     if something.remove(&attr_name).is_none() {
-        return Err(AgentError::NotFound { object: "Attribute", id: format!("Table::{}", attr_name) });
+        return Err(AgentError::NotFound {
+            object: "Attribute",
+            id: format!("Table::{}", attr_name),
+        });
     }
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
         Ok(schema) => schema,
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     };
     let current_policies = policy_store.get_policies().await;
-    match policy_store.update_policies(current_policies, Some(cedar_schema.clone())).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing policies invalid with the new schema: {}", err),
-        })
+    match policy_store
+        .update_policies(current_policies, Some(cedar_schema.clone()))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing policies invalid with the new schema: {}", err),
+            })
+        }
     }
-    
+
     // validate the new schema with the current entities
     let current_entities = data_store.get_entities().await;
-    match data_store.update_entities(current_entities, Some(cedar_schema)).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing entities invalid with the new schema: {}", err),
-        })
+    match data_store
+        .update_entities(current_entities, Some(cedar_schema))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing entities invalid with the new schema: {}", err),
+            })
+        }
     }
 
     // update the schema in the store
@@ -229,10 +261,9 @@ pub async fn delete_table_attribute(
         Ok(_) => Ok(status::NoContent),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
-        })
+        }),
     }
 }
-
 
 async fn add_entity_attribute(
     entity_type: &str,
@@ -243,7 +274,7 @@ async fn add_entity_attribute(
 ) -> Result<Json<InternalSchema>, AgentError> {
     // get current schema in json format
     let mut schema: InternalSchema = schema_store.get_internal_schema().await;
-    
+
     let attr = attr.into_inner();
 
     let new_attr = json!(
@@ -252,7 +283,9 @@ async fn add_entity_attribute(
             "required": attr.is_required()
         }
     );
-    let something = schema.get_mut().get_mut("")
+    let something = schema
+        .get_mut()
+        .get_mut("")
         .and_then(|v| v.get_mut("entityTypes"))
         .and_then(|v| v.get_mut(entity_type))
         .and_then(|v| v.get_mut("shape"))
@@ -265,52 +298,72 @@ async fn add_entity_attribute(
             reason: format!("Entity type '{}' not found in schema", entity_type),
         })?;
     if something.contains_key(attr.get_name()) {
-        warn!("Duplicate attribute '{}' on entity '{}'", attr.get_name(), entity_type);
-        return Err(AgentError::Duplicate { object: "Attribute", id: format!("{}::{}", entity_type, attr.get_name()) });
+        warn!(
+            "Duplicate attribute '{}' on entity '{}'",
+            attr.get_name(),
+            entity_type
+        );
+        return Err(AgentError::Duplicate {
+            object: "Attribute",
+            id: format!("{}::{}", entity_type, attr.get_name()),
+        });
     }
     something.insert(attr.get_name().clone(), new_attr);
 
-    
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
         Ok(schema) => schema,
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     };
     let current_policies = policy_store.get_policies().await;
-    match policy_store.update_policies(current_policies, Some(cedar_schema.clone())).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing policies invalid with the new schema: {}", err),
-        })
+    match policy_store
+        .update_policies(current_policies, Some(cedar_schema.clone()))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing policies invalid with the new schema: {}", err),
+            })
+        }
     }
 
     // validate the new schema with the current entities
     let current_entities = data_store.get_entities().await;
-    match data_store.update_entities(current_entities, Some(cedar_schema)).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing entities invalid with the new schema: {}", err),
-        })
+    match data_store
+        .update_entities(current_entities, Some(cedar_schema))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing entities invalid with the new schema: {}", err),
+            })
+        }
     }
 
     // update the schema in the store
     match schema_store.update_schema(schema.clone()).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     }
 
     let entity_schema = schema
-    .get()
-    .get("")
-    .and_then(|v| v.get("entityTypes"))
-    .and_then(|v| v.get(entity_type))
-    .ok_or_else(|| AgentError::BadRequest {
-        reason: format!("Entity type '{}' not found in schema", entity_type),
-    })?;
+        .get()
+        .get("")
+        .and_then(|v| v.get("entityTypes"))
+        .and_then(|v| v.get(entity_type))
+        .ok_or_else(|| AgentError::BadRequest {
+            reason: format!("Entity type '{}' not found in schema", entity_type),
+        })?;
 
     let entity_schema = InternalSchema::from(entity_schema.clone());
 
@@ -328,19 +381,24 @@ pub async fn add_generic_attribute(
 ) -> Result<Json<InternalSchema>, AgentError> {
     let attr = attr.into_inner();
     let namespace = attr.namespace.unwrap_or_default();
-    info!("Adding generic attribute '{}' to entity '{}' in namespace '{}'", attr.name, attr.entity_type, namespace);
-    
+    info!(
+        "Adding generic attribute '{}' to entity '{}' in namespace '{}'",
+        attr.name, attr.entity_type, namespace
+    );
+
     // get current schema in json format
     let mut schema: InternalSchema = schema_store.get_internal_schema().await;
-    
+
     let new_attr = json!(
         {
             "type": attr.attr_type,
             "required": attr.required
         }
     );
-    
-    let something = schema.get_mut().get_mut(&namespace)
+
+    let something = schema
+        .get_mut()
+        .get_mut(&namespace)
         .ok_or_else(|| AgentError::BadRequest {
             reason: format!("Namespace '{}' not found in schema", namespace),
         })?
@@ -358,49 +416,75 @@ pub async fn add_generic_attribute(
         })?
         .get_mut("attributes")
         .ok_or_else(|| AgentError::BadRequest {
-            reason: format!("Attributes not found for entity type '{}'", attr.entity_type),
+            reason: format!(
+                "Attributes not found for entity type '{}'",
+                attr.entity_type
+            ),
         })?
         .as_object_mut()
         .ok_or_else(|| AgentError::BadRequest {
-            reason: format!("Attributes is not an object for entity type '{}'", attr.entity_type),
+            reason: format!(
+                "Attributes is not an object for entity type '{}'",
+                attr.entity_type
+            ),
         })?;
-    
+
     if something.contains_key(&attr.name) {
-        warn!("Duplicate attribute '{}' on entity '{}'", attr.name, attr.entity_type);
-        return Err(AgentError::Duplicate { object: "Attribute", id: format!("{}::{}", attr.entity_type, attr.name) });
+        warn!(
+            "Duplicate attribute '{}' on entity '{}'",
+            attr.name, attr.entity_type
+        );
+        return Err(AgentError::Duplicate {
+            object: "Attribute",
+            id: format!("{}::{}", attr.entity_type, attr.name),
+        });
     }
     something.insert(attr.name.clone(), new_attr);
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
         Ok(schema) => schema,
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     };
     let current_policies = policy_store.get_policies().await;
-    match policy_store.update_policies(current_policies, Some(cedar_schema.clone())).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing policies invalid with the new schema: {}", err),
-        })
+    match policy_store
+        .update_policies(current_policies, Some(cedar_schema.clone()))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing policies invalid with the new schema: {}", err),
+            })
+        }
     }
 
     // validate the new schema with the current entities
     let current_entities = data_store.get_entities().await;
-    match data_store.update_entities(current_entities, Some(cedar_schema)).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing entities invalid with the new schema: {}", err),
-        })
+    match data_store
+        .update_entities(current_entities, Some(cedar_schema))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing entities invalid with the new schema: {}", err),
+            })
+        }
     }
 
     // update the schema in the store
     match schema_store.update_schema(schema.clone()).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     }
 
     Ok(Json::from(schema))
@@ -417,10 +501,15 @@ pub async fn delete_generic_attribute(
 ) -> Result<status::NoContent, AgentError> {
     let attr = attr.into_inner();
     let namespace = attr.namespace.unwrap_or_default();
-    info!("Deleting generic attribute '{}' from entity '{}' in namespace '{}'", attr.name, attr.entity_type, namespace);
-    
+    info!(
+        "Deleting generic attribute '{}' from entity '{}' in namespace '{}'",
+        attr.name, attr.entity_type, namespace
+    );
+
     let mut schema = schema_store.get_internal_schema().await;
-    let something = schema.get_mut().get_mut(&namespace)
+    let something = schema
+        .get_mut()
+        .get_mut(&namespace)
         .ok_or_else(|| AgentError::BadRequest {
             reason: format!("Namespace '{}' not found in schema", namespace),
         })?
@@ -438,45 +527,66 @@ pub async fn delete_generic_attribute(
         })?
         .get_mut("attributes")
         .ok_or_else(|| AgentError::BadRequest {
-            reason: format!("Attributes not found for entity type '{}'", attr.entity_type),
+            reason: format!(
+                "Attributes not found for entity type '{}'",
+                attr.entity_type
+            ),
         })?
         .as_object_mut()
         .ok_or_else(|| AgentError::BadRequest {
-            reason: format!("Attributes is not an object for entity type '{}'", attr.entity_type),
+            reason: format!(
+                "Attributes is not an object for entity type '{}'",
+                attr.entity_type
+            ),
         })?;
-    
+
     if something.remove(&attr.name).is_none() {
-        return Err(AgentError::NotFound { object: "Attribute", id: format!("{}::{}", attr.entity_type, attr.name) });
+        return Err(AgentError::NotFound {
+            object: "Attribute",
+            id: format!("{}::{}", attr.entity_type, attr.name),
+        });
     }
 
     // validate the new schema with the current policies
     let cedar_schema: CedarSchema = match schema.clone().try_into() {
         Ok(schema) => schema,
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        })
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        }
     };
 
     let current_policies = policy_store.get_policies().await;
-    match policy_store.update_policies(current_policies, Some(cedar_schema.clone())).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing policies invalid with the new schema: {}", err),
-        })
+    match policy_store
+        .update_policies(current_policies, Some(cedar_schema.clone()))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing policies invalid with the new schema: {}", err),
+            })
+        }
     }
     // validate the new schema with the current entities
     let current_entities = data_store.get_entities().await;
-    match data_store.update_entities(current_entities, Some(cedar_schema)).await {
-        Ok(_) => {},
-        Err(err) => return Err(AgentError::BadRequest {
-            reason: format!("Existing entities invalid with the new schema: {}", err),
-        })
+    match data_store
+        .update_entities(current_entities, Some(cedar_schema))
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(AgentError::BadRequest {
+                reason: format!("Existing entities invalid with the new schema: {}", err),
+            })
+        }
     }
     // update the schema in the store
     match schema_store.update_schema(schema).await {
         Ok(_) => Ok(status::NoContent),
         Err(err) => Err(AgentError::BadRequest {
             reason: err.to_string(),
-        })
+        }),
     }
 }

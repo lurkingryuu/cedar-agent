@@ -1,26 +1,25 @@
-use std::path::PathBuf;
+use log::{error, info};
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
-use log::{error, info};
+use std::path::PathBuf;
 
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::Rocket;
 use rocket::Build;
+use rocket::Rocket;
 
-use crate::services::data::DataStore;
-use crate::services::schema::SchemaStore;
 use crate::config;
 use crate::schemas::data::Entities;
+use crate::services::data::DataStore;
+use crate::services::schema::SchemaStore;
 
 pub struct InitDataFairing;
 
 pub(crate) async fn init(
     conf: &config::Config,
     data_store: &Box<dyn DataStore>,
-    schema_store: &Box<dyn SchemaStore>
+    schema_store: &Box<dyn SchemaStore>,
 ) {
-
     if conf.data.is_none() {
         return;
     }
@@ -38,7 +37,11 @@ pub(crate) async fn init(
     let schema = schema_store.get_cedar_schema().await;
     match data_store.update_entities(entities, schema).await {
         Ok(entities) => {
-            info!("Successfully updated entities from file {}: {} entities", &file_path.display(), entities.len());
+            info!(
+                "Successfully updated entities from file {}: {} entities",
+                &file_path.display(),
+                entities.len()
+            );
         }
         Err(err) => {
             error!("Failed to update entities: {}", err);
@@ -48,11 +51,10 @@ pub(crate) async fn init(
 }
 
 pub async fn load_entities_from_file(path: PathBuf) -> Result<Entities, Box<dyn Error>> {
-    
     if !path.try_exists().unwrap_or(false) || !path.is_file() {
         return Err("File does not exist".into());
     }
-    
+
     if path.extension().unwrap() != "json" {
         return Err("File is not a json file".into());
     }
@@ -71,7 +73,7 @@ pub async fn load_entities_from_file(path: PathBuf) -> Result<Entities, Box<dyn 
         Ok(entities) => entities,
         Err(err) => return Err(format!("Failed to deserialize JSON: {}", err).into()),
     };
-    
+
     Ok(entities)
 }
 
@@ -80,7 +82,7 @@ impl Fairing for InitDataFairing {
     fn info(&self) -> Info {
         Info {
             name: "Init Data",
-            kind: Kind::Ignite
+            kind: Kind::Ignite,
         }
     }
 
@@ -94,8 +96,9 @@ impl Fairing for InitDataFairing {
         init(
             config.unwrap(),
             rocket.state::<Box<dyn DataStore>>().unwrap(),
-            rocket.state::<Box<dyn SchemaStore>>().unwrap()
-        ).await;
+            rocket.state::<Box<dyn SchemaStore>>().unwrap(),
+        )
+        .await;
 
         Ok(rocket)
     }

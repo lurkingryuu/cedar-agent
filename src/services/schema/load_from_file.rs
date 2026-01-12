@@ -5,8 +5,8 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use log::{error, info};
-use rocket::{Build, Rocket};
 use rocket::fairing::{Fairing, Info, Kind};
+use rocket::{Build, Rocket};
 
 use crate::config;
 use crate::schemas::schema::Schema;
@@ -26,16 +26,19 @@ pub(crate) async fn init(conf: &config::Config, schema_store: &Box<dyn SchemaSto
         Err(err) => {
             error!("Failed to load schema from file: {}", err);
             return;
-        },
+        }
     };
 
     match schema_store.update_schema(schema).await {
         Ok(_) => {
-            info!("Successfully updated schema from file {}", &file_path.display());
-        },
+            info!(
+                "Successfully updated schema from file {}",
+                &file_path.display()
+            );
+        }
         Err(err) => {
             error!("Failed to update schema: {}", err);
-        },
+        }
     }
 }
 
@@ -56,10 +59,10 @@ pub async fn load_schema_from_file(path: PathBuf) -> Result<Schema, Box<dyn Erro
     let mut contents = String::new();
     match file.read_to_string(&mut contents) {
         Ok(_) => match rocket::serde::json::from_str(&contents) {
-                Ok(schema) => Ok(schema),
-                Err(err) => Err(format!("Failed to deserialize JSON: {}", err).into()),
-            }
-        Err(err) => Err(format!("Failed to read file {}", err).into())
+            Ok(schema) => Ok(schema),
+            Err(err) => Err(format!("Failed to deserialize JSON: {}", err).into()),
+        },
+        Err(err) => Err(format!("Failed to read file {}", err).into()),
     }
 }
 
@@ -68,7 +71,7 @@ impl Fairing for InitSchemaFairing {
     fn info(&self) -> Info {
         Info {
             name: "Init Schema",
-            kind: Kind::Ignite
+            kind: Kind::Ignite,
         }
     }
 
@@ -76,7 +79,11 @@ impl Fairing for InitSchemaFairing {
         let config = rocket.state::<config::Config>();
 
         if config.is_some() {
-            init(config.unwrap(), rocket.state::<Box<dyn SchemaStore>>().unwrap()).await;
+            init(
+                config.unwrap(),
+                rocket.state::<Box<dyn SchemaStore>>().unwrap(),
+            )
+            .await;
         }
 
         Ok(rocket)
