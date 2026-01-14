@@ -496,16 +496,17 @@ pub async fn update_single_data_entry(
     entity_id: String,
     entities: Json<schemas::Entities>,
 ) -> Result<Json<schemas::Entity>, AgentError> {
-    debug!("Updating single data entry with id: {}", entity_id);
-    if entities.len() != 1 {
+    info!("Updating single data entry with id: {}", entity_id);
+    let new_entity = if entities.len() == 1 {
+        entities.into_inner().into_iter().next().unwrap()
+    } else {
+        warn!("Validation failed: Exactly one entity is required, received {}", entities.len());
         return Err(AgentError::BadRequest {
-            reason: "Only one entity can be updated at a time".to_string(),
+            reason: "Exactly one entity is required".to_string(),
         });
-    }
-
+    };
     let schema = schema_store.get_cedar_schema().await;
-    let new_entity = entities.into_inner().into_iter().last().unwrap();
-    debug!("Received entity: {:#?}", new_entity);
+    info!("Received entity for update: {:#?}", new_entity);
     // Ensure the provided entity's uid.id or full UID matches the path id
     if let Some(uid) = new_entity.get().get("uid") {
         let payload_id = uid.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -524,6 +525,7 @@ pub async fn update_single_data_entry(
         }
 
         if !matched {
+            warn!("Validation failed: Entity id mismatch. Path: {}, Payload: {} (or {})", entity_id, payload_id, full_payload_uid);
             return Err(AgentError::BadRequest {
                 reason: format!(
                     "Entity id/UID in payload ('{}' / '{}') does not match path id ('{}')",
@@ -534,7 +536,7 @@ pub async fn update_single_data_entry(
     }
     let existing_entities = data_store.get_entities().await;
 
-    // Check if entity already exists - if so, return 409 Conflict
+    // Check if entity already exists - if so, just return success (idempotent)
     if let Some(uid) = new_entity.get().get("uid") {
         if let (Some(id), Some(typ)) = (uid.get("id"), uid.get("type")) {
             if let (Some(id_str), Some(typ_str)) = (id.as_str(), typ.as_str()) {
@@ -545,28 +547,31 @@ pub async fn update_single_data_entry(
                     }
                     false
                 }) {
-                    warn!(
-                        "Duplicate entity detected when updating single entry: {}::{}",
+                    info!(
+                        "Entity already exists, returning success (idempotent): {}::{}",
                         typ_str, id_str
                     );
-                    return Err(AgentError::Duplicate {
-                        object: "Entity",
-                        id: format!("{}::{}", typ_str, id_str),
-                    });
+                    return Ok(Json::from(new_entity));
                 }
             }
         }
     }
 
     // Entity doesn't exist, add it as new atomically
-    debug!("Creating new entity: {:#?}", new_entity);
+    info!("Creating new entity: {:#?}", new_entity);
 
     // Persist the new entity to the data store atomically
     match data_store.add_entities(vec![new_entity.clone()].into_iter().collect(), schema).await {
-        Ok(_) => Ok(Json::from(new_entity)),
-        Err(err) => Err(AgentError::BadRequest {
-            reason: err.to_string(),
-        }),
+        Ok(_) => {
+            info!("Successfully added entity: {:?}", new_entity.get().get("uid"));
+            Ok(Json::from(new_entity))
+        },
+        Err(err) => {
+            warn!("Failed to add entity: {}", err);
+            Err(AgentError::BadRequest {
+                reason: err.to_string(),
+            })
+        },
     }
 }
 
